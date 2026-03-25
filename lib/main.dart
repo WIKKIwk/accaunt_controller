@@ -169,6 +169,22 @@ class _NavigationPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    const sections = [
+      (AppSection.home, 'Home', Icons.home_outlined, Icons.home_rounded),
+      (
+        AppSection.accounts,
+        'Accounts',
+        Icons.manage_accounts_outlined,
+        Icons.manage_accounts_rounded,
+      ),
+      (
+        AppSection.settings,
+        'Settings',
+        Icons.settings_outlined,
+        Icons.settings_rounded,
+      ),
+    ];
 
     return Card(
       elevation: 0,
@@ -176,11 +192,12 @@ class _NavigationPanel extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: expanded ? 248 : 88,
+        width: expanded ? 232 : 84,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               child: Row(
                 children: [
                   IconButton(
@@ -190,58 +207,113 @@ class _NavigationPanel extends StatelessWidget {
                   ),
                   if (expanded) ...[
                     const SizedBox(width: 4),
-                    Text(
-                      'Modules',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+                    Text('Modules', style: theme.textTheme.titleMedium),
                   ],
                 ],
               ),
             ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 10),
+              child: expanded
+                  ? FilledButton.tonalIcon(
+                      onPressed: onAddAccount,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add account'),
+                    )
+                  : IconButton.filledTonal(
+                      onPressed: onAddAccount,
+                      tooltip: 'Add account',
+                      icon: const Icon(Icons.add),
+                    ),
+            ),
+            const SizedBox(height: 20),
             Expanded(
-              child: NavigationRail(
-                extended: expanded,
-                backgroundColor: Colors.transparent,
-                selectedIndex: currentSection.index,
-                onDestinationSelected: (index) =>
-                    onSectionSelected(AppSection.values[index]),
-                labelType: expanded
-                    ? NavigationRailLabelType.none
-                    : NavigationRailLabelType.all,
-                leading: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: expanded
-                      ? FilledButton.tonalIcon(
-                          onPressed: onAddAccount,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add account'),
-                        )
-                      : IconButton.filledTonal(
-                          onPressed: onAddAccount,
-                          tooltip: 'Add account',
-                          icon: const Icon(Icons.add),
-                        ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: expanded ? 12 : 8),
+                child: Column(
+                  children: [
+                    for (final section in sections) ...[
+                      _ModuleTile(
+                        expanded: expanded,
+                        selected: currentSection == section.$1,
+                        label: section.$2,
+                        icon: currentSection == section.$1
+                            ? section.$4
+                            : section.$3,
+                        onTap: () => onSectionSelected(section.$1),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                  ],
                 ),
-                destinations: const [
-                  NavigationRailDestination(
-                    icon: Icon(Icons.home_outlined),
-                    selectedIcon: Icon(Icons.home_rounded),
-                    label: Text('Home'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.manage_accounts_outlined),
-                    selectedIcon: Icon(Icons.manage_accounts_rounded),
-                    label: Text('Accounts'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings_rounded),
-                    label: Text('Settings'),
-                  ),
-                ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModuleTile extends StatelessWidget {
+  const _ModuleTile({
+    required this.expanded,
+    required this.selected,
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final bool expanded;
+  final bool selected;
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Material(
+      color: selected ? scheme.secondaryContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          height: 56,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 0),
+            child: expanded
+                ? Row(
+                    children: [
+                      Icon(
+                        icon,
+                        color: selected
+                            ? scheme.onSecondaryContainer
+                            : scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        label,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: selected
+                              ? scheme.onSecondaryContainer
+                              : scheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  )
+                : Center(
+                    child: Icon(
+                      icon,
+                      color: selected
+                          ? scheme.onSecondaryContainer
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ),
+          ),
         ),
       ),
     );
