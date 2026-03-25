@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:clash/models/app_color_style.dart';
 import 'package:clash/models/codex_profile.dart';
 import 'package:clash/services/codex_command_service.dart';
 import 'package:clash/services/profile_store.dart';
@@ -20,7 +19,6 @@ class AppController extends ChangeNotifier {
   String? _activeProfileId;
   Timer? _loginWatchTimer;
   ThemeMode _themeMode = ThemeMode.dark;
-  AppColorStyle _colorStyle = AppColorStyle.orange;
   bool _isLoading = true;
   bool _isBusy = false;
   String? _errorMessage;
@@ -28,7 +26,6 @@ class AppController extends ChangeNotifier {
 
   List<CodexProfile> get profiles => _profiles;
   ThemeMode get themeMode => _themeMode;
-  AppColorStyle get colorStyle => _colorStyle;
   bool get isLoading => _isLoading;
   bool get isBusy => _isBusy;
   String? get errorMessage => _errorMessage;
@@ -54,7 +51,6 @@ class AppController extends ChangeNotifier {
       final stored = await _profileStore.load();
       _profiles = stored.profiles;
       _themeMode = _themeModeFromName(stored.themeModeName);
-      _colorStyle = AppColorStyleX.fromStorageName(stored.colorStyleName);
       _activeProfileId =
           stored.activeProfileId ?? stored.profiles.firstOrNull?.id;
       final initialProfile = activeProfile;
@@ -187,11 +183,6 @@ class AppController extends ChangeNotifier {
     await _persist(statusMessage: 'Theme updated.');
   }
 
-  Future<void> setColorStyle(AppColorStyle colorStyle) async {
-    _colorStyle = colorStyle;
-    await _persist(statusMessage: 'Color style updated.');
-  }
-
   Future<void> refreshActiveProfile() async {
     final profile = activeProfile;
     if (profile == null) {
@@ -301,7 +292,6 @@ class AppController extends ChangeNotifier {
       activeProfileId: _activeProfileId,
       profiles: _profiles,
       themeModeName: _themeModeName(_themeMode),
-      colorStyleName: _colorStyle.storageName,
     );
     _statusMessage = statusMessage ?? _statusMessage;
     notifyListeners();
@@ -348,7 +338,6 @@ class AppController extends ChangeNotifier {
         activeProfileId: _activeProfileId,
         profiles: _profiles,
         themeModeName: _themeModeName(_themeMode),
-        colorStyleName: _colorStyle.storageName,
       );
       if (successMessage != null) {
         _statusMessage = successMessage;
@@ -385,7 +374,6 @@ class AppController extends ChangeNotifier {
           activeProfileId: _activeProfileId,
           profiles: _profiles,
           themeModeName: _themeModeName(_themeMode),
-          colorStyleName: _colorStyle.storageName,
         );
 
         if (probe.isLoggedIn) {
@@ -404,7 +392,6 @@ class AppController extends ChangeNotifier {
             activeProfileId: _activeProfileId,
             profiles: _profiles,
             themeModeName: _themeModeName(_themeMode),
-            colorStyleName: _colorStyle.storageName,
           );
           _statusMessage = '"${profile.label}" is signed in.';
           timer.cancel();

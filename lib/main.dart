@@ -29,22 +29,31 @@ class ClashApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final seed = controller.colorStyle.data.seedColor;
-        final lightScheme = ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.light,
-        );
-        final darkScheme = ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.dark,
-        );
+        final lightScheme = _buildLightColorScheme();
+        final darkScheme = _buildDarkColorScheme();
 
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Codex Clash',
           themeMode: controller.themeMode,
-          theme: ThemeData(colorScheme: lightScheme, useMaterial3: true),
-          darkTheme: ThemeData(colorScheme: darkScheme, useMaterial3: true),
+          theme: ThemeData(
+            colorScheme: lightScheme,
+            scaffoldBackgroundColor: AppPalette.paper,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: AppPalette.paper,
+              foregroundColor: AppPalette.ink,
+            ),
+            useMaterial3: true,
+          ),
+          darkTheme: ThemeData(
+            colorScheme: darkScheme,
+            scaffoldBackgroundColor: AppPalette.ink,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: AppPalette.ink,
+              foregroundColor: AppPalette.paper,
+            ),
+            useMaterial3: true,
+          ),
           home: ClashHomePage(controller: controller),
         );
       },
@@ -1009,34 +1018,56 @@ class _SettingsWorkspace extends StatelessWidget {
                           }),
                         ),
                         const SizedBox(height: 20),
-                        Text('Color style', style: theme.textTheme.titleMedium),
+                        Text(
+                          'Theme palette',
+                          style: theme.textTheme.titleMedium,
+                        ),
                         const SizedBox(height: 8),
                         Text(
-                          'Pick the accent palette used by the app.',
+                          'All four colors below are used together as one palette.',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            for (final style in AppColorStyle.values)
-                              ChoiceChip(
-                                selected: controller.colorStyle == style,
-                                onSelected: (_) async {
-                                  await controller.setColorStyle(style);
-                                },
-                                avatar: CircleAvatar(
-                                  radius: 10,
-                                  backgroundColor: style.data.seedColor,
-                                ),
-                                label: Text(
-                                  '${style.data.label}  ${style.data.hexLabel}',
-                                ),
-                              ),
-                          ],
+                        Card.outlined(
+                          margin: EdgeInsets.zero,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Wrap(
+                              spacing: 20,
+                              runSpacing: 16,
+                              children: [
+                                for (final swatch in AppPalette.swatches)
+                                  SizedBox(
+                                    width: 120,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 18,
+                                          backgroundColor: swatch.color,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          swatch.hexLabel,
+                                          style: theme.textTheme.labelLarge,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          swatch.label,
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: scheme.onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1446,3 +1477,55 @@ const List<String> _monthNames = [
 ];
 
 enum BannerTone { info, error }
+
+ColorScheme _buildLightColorScheme() {
+  final base = ColorScheme.fromSeed(
+    seedColor: AppPalette.accent,
+    brightness: Brightness.light,
+  );
+
+  return base.copyWith(
+    primary: AppPalette.accent,
+    onPrimary: AppPalette.paper,
+    secondary: AppPalette.muted,
+    onSecondary: AppPalette.paper,
+    tertiary: AppPalette.ink,
+    onTertiary: AppPalette.paper,
+    surface: AppPalette.paper,
+    onSurface: AppPalette.ink,
+    onSurfaceVariant: AppPalette.muted,
+    outline: AppPalette.muted.withValues(alpha: 0.45),
+    surfaceContainerLowest: const Color(0xFFFFFFFF),
+    surfaceContainerLow: const Color(0xFFF7F7F7),
+    surfaceContainer: const Color(0xFFF0F0F0),
+    surfaceContainerHigh: const Color(0xFFE8E8E8),
+    surfaceContainerHighest: const Color(0xFFE1E1E1),
+    secondaryContainer: const Color(0xFFD9DDE3),
+  );
+}
+
+ColorScheme _buildDarkColorScheme() {
+  final base = ColorScheme.fromSeed(
+    seedColor: AppPalette.accent,
+    brightness: Brightness.dark,
+  );
+
+  return base.copyWith(
+    primary: AppPalette.accent,
+    onPrimary: AppPalette.paper,
+    secondary: AppPalette.muted,
+    onSecondary: AppPalette.paper,
+    tertiary: AppPalette.paper,
+    onTertiary: AppPalette.ink,
+    surface: AppPalette.ink,
+    onSurface: AppPalette.paper,
+    onSurfaceVariant: const Color(0xFFC1C5CC),
+    outline: AppPalette.muted,
+    surfaceContainerLowest: const Color(0xFF23262B),
+    surfaceContainerLow: const Color(0xFF2B2F35),
+    surfaceContainer: const Color(0xFF333840),
+    surfaceContainerHigh: const Color(0xFF3A4049),
+    surfaceContainerHighest: const Color(0xFF434A54),
+    secondaryContainer: const Color(0xFF4A515B),
+  );
+}
