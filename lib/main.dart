@@ -118,7 +118,6 @@ class _ClashHomePageState extends State<ClashHomePage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _NavigationPanel(
-                            controller: widget.controller,
                             expanded: _navExpanded,
                             currentSection: _section,
                             onToggleExpanded: () {
@@ -169,6 +168,10 @@ class _ClashHomePageState extends State<ClashHomePage> {
                                 AppSection.accounts => _AccountsWorkspace(
                                   key: const ValueKey('accounts'),
                                   controller: widget.controller,
+                                  onAddAccount: () => _showAddProfileDialog(
+                                    context,
+                                    widget.controller,
+                                  ),
                                 ),
                                 AppSection.settings => _SettingsWorkspace(
                                   key: const ValueKey('settings'),
@@ -190,14 +193,12 @@ class _ClashHomePageState extends State<ClashHomePage> {
 
 class _NavigationPanel extends StatelessWidget {
   const _NavigationPanel({
-    required this.controller,
     required this.expanded,
     required this.currentSection,
     required this.onToggleExpanded,
     required this.onSectionSelected,
   });
 
-  final AppController controller;
   final bool expanded;
   final AppSection currentSection;
   final VoidCallback onToggleExpanded;
@@ -225,9 +226,7 @@ class _NavigationPanel extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      width: expanded
-          ? (currentSection == AppSection.accounts ? 320 : 232)
-          : 84,
+      width: expanded ? 232 : 84,
       color: _panelSurface(scheme),
       child: Column(
         crossAxisAlignment: expanded
@@ -276,78 +275,6 @@ class _NavigationPanel extends StatelessWidget {
                       onTap: () => onSectionSelected(section.$1),
                     ),
                     const SizedBox(height: 6),
-                  ],
-                  if (expanded && currentSection == AppSection.accounts) ...[
-                    const SizedBox(height: 12),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Accounts',
-                            style: theme.textTheme.titleMedium,
-                          ),
-                        ),
-                        FilledButton.tonalIcon(
-                          onPressed: () =>
-                              _showAddProfileDialog(context, controller),
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Select a profile to manage its login and limits.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: ReorderableListView.builder(
-                        buildDefaultDragHandles: false,
-                        itemBuilder: (context, index) {
-                          final profile = controller.profiles[index];
-                          return Padding(
-                            key: ValueKey(profile.id),
-                            padding: EdgeInsets.only(
-                              bottom: index == controller.profiles.length - 1
-                                  ? 0
-                                  : 12,
-                            ),
-                            child: ReorderableDelayedDragStartListener(
-                              index: index,
-                              child: _AccountListTile(
-                                profile: profile,
-                                selected:
-                                    controller.activeProfile?.id == profile.id,
-                                onTap: () =>
-                                    controller.selectProfile(profile.id),
-                                onRename: () => _showRenameProfileDialog(
-                                  context,
-                                  controller,
-                                  profile,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                        itemCount: controller.profiles.length,
-                        onReorder: controller.reorderProfiles,
-                      ),
-                    ),
-                    if (controller.errorMessage case final error?)
-                      _InlineBanner(message: error, tone: BannerTone.error),
-                    if (controller.statusMessage case final message?)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: _InlineBanner(
-                          message: message,
-                          tone: BannerTone.info,
-                        ),
-                      ),
                   ],
                 ],
               ),
@@ -724,9 +651,14 @@ class _DashboardLimitRow extends StatelessWidget {
 }
 
 class _AccountsWorkspace extends StatelessWidget {
-  const _AccountsWorkspace({super.key, required this.controller});
+  const _AccountsWorkspace({
+    super.key,
+    required this.controller,
+    required this.onAddAccount,
+  });
 
   final AppController controller;
+  final VoidCallback onAddAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -739,10 +671,103 @@ class _AccountsWorkspace extends StatelessWidget {
       );
     }
 
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      child: _AccountDetailCard(controller: controller),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 320,
+          child: _AccountsListPane(
+            controller: controller,
+            onAddAccount: onAddAccount,
+          ),
+        ),
+        const VerticalDivider(width: 1, thickness: 1),
+        Expanded(child: _AccountDetailCard(controller: controller)),
+      ],
+    );
+  }
+}
+
+class _AccountsListPane extends StatelessWidget {
+  const _AccountsListPane({
+    required this.controller,
+    required this.onAddAccount,
+  });
+
+  final AppController controller;
+  final VoidCallback onAddAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ColoredBox(
+      color: _panelSurface(scheme),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Accounts', style: theme.textTheme.titleLarge),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: onAddAccount,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Select a profile to manage its login and limits.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ReorderableListView.builder(
+                buildDefaultDragHandles: false,
+                itemBuilder: (context, index) {
+                  final profile = controller.profiles[index];
+                  return Padding(
+                    key: ValueKey(profile.id),
+                    padding: EdgeInsets.only(
+                      bottom: index == controller.profiles.length - 1 ? 0 : 12,
+                    ),
+                    child: ReorderableDelayedDragStartListener(
+                      index: index,
+                      child: _AccountListTile(
+                        profile: profile,
+                        selected: controller.activeProfile?.id == profile.id,
+                        onTap: () => controller.selectProfile(profile.id),
+                        onRename: () => _showRenameProfileDialog(
+                          context,
+                          controller,
+                          profile,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                itemCount: controller.profiles.length,
+                onReorder: controller.reorderProfiles,
+              ),
+            ),
+            if (controller.errorMessage case final error?)
+              _InlineBanner(message: error, tone: BannerTone.error),
+            if (controller.statusMessage case final message?)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: _InlineBanner(message: message, tone: BannerTone.info),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
