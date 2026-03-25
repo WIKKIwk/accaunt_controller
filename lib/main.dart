@@ -373,14 +373,6 @@ class _HomeDashboard extends StatelessWidget {
       );
     }
 
-    final signedInCount = profiles.where((profile) {
-      return profile.lastProbe?.isLoggedIn ?? false;
-    }).length;
-    final needingLoginCount = profiles.length - signedInCount;
-    final accountsWithLimits = profiles.where((profile) {
-      return profile.lastProbe?.usageSnapshot?.windows.isNotEmpty ?? false;
-    }).length;
-
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1040),
@@ -395,17 +387,6 @@ class _HomeDashboard extends StatelessWidget {
                 style: Theme.of(
                   context,
                 ).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _MetricChip(label: '${profiles.length} accounts'),
-                  _MetricChip(label: '$signedInCount signed in'),
-                  _MetricChip(label: '$needingLoginCount need login'),
-                  _MetricChip(label: '$accountsWithLimits with limits'),
-                ],
               ),
               const SizedBox(height: 20),
               Card(
@@ -1033,21 +1014,6 @@ class _AccountDetailCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _MetricChip extends StatelessWidget {
-  const _MetricChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 }
