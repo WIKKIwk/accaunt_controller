@@ -146,6 +146,25 @@ class AppController extends ChangeNotifier {
     await _persist(statusMessage: 'Moved "${current.label}" down.');
   }
 
+  Future<void> reorderProfiles(int oldIndex, int newIndex) async {
+    if (oldIndex < 0 || oldIndex >= _profiles.length) {
+      return;
+    }
+
+    final reordered = [..._profiles];
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+    if (newIndex < 0 || newIndex >= reordered.length) {
+      return;
+    }
+
+    final profile = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, profile);
+    _profiles = reordered;
+    await _persist(statusMessage: 'Reordered "${profile.label}".');
+  }
+
   Future<String> suggestCodexHome(String label) {
     return _profileStore.defaultCodexHomeForLabel(label);
   }

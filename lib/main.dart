@@ -581,24 +581,32 @@ class _AccountsListCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.separated(
+              child: ReorderableListView.builder(
+                buildDefaultDragHandles: false,
                 itemBuilder: (context, index) {
                   final profile = controller.profiles[index];
-                  return _AccountListTile(
-                    profile: profile,
-                    selected: controller.activeProfile?.id == profile.id,
-                    onTap: () => controller.selectProfile(profile.id),
-                    onRename: () =>
-                        _showRenameProfileDialog(context, controller, profile),
-                    canMoveUp: index > 0,
-                    canMoveDown: index < controller.profiles.length - 1,
-                    onMoveUp: () => controller.moveProfileUp(profile.id),
-                    onMoveDown: () => controller.moveProfileDown(profile.id),
+                  return Padding(
+                    key: ValueKey(profile.id),
+                    padding: EdgeInsets.only(
+                      bottom: index == controller.profiles.length - 1 ? 0 : 12,
+                    ),
+                    child: ReorderableDelayedDragStartListener(
+                      index: index,
+                      child: _AccountListTile(
+                        profile: profile,
+                        selected: controller.activeProfile?.id == profile.id,
+                        onTap: () => controller.selectProfile(profile.id),
+                        onRename: () => _showRenameProfileDialog(
+                          context,
+                          controller,
+                          profile,
+                        ),
+                      ),
+                    ),
                   );
                 },
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 12),
                 itemCount: controller.profiles.length,
+                onReorder: controller.reorderProfiles,
               ),
             ),
             if (controller.errorMessage case final error?)
@@ -621,20 +629,12 @@ class _AccountListTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onRename,
-    required this.canMoveUp,
-    required this.canMoveDown,
-    required this.onMoveUp,
-    required this.onMoveDown,
   });
 
   final CodexProfile profile;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onRename;
-  final bool canMoveUp;
-  final bool canMoveDown;
-  final VoidCallback onMoveUp;
-  final VoidCallback onMoveDown;
 
   @override
   Widget build(BuildContext context) {
@@ -652,28 +652,14 @@ class _AccountListTile extends StatelessWidget {
       final action = await showMenu<String>(
         context: context,
         position: position,
-        items: [
-          const PopupMenuItem<String>(value: 'rename', child: Text('Rename')),
-          PopupMenuItem<String>(
-            value: 'up',
-            enabled: canMoveUp,
-            child: const Text('Move up'),
-          ),
-          PopupMenuItem<String>(
-            value: 'down',
-            enabled: canMoveDown,
-            child: const Text('Move down'),
-          ),
+        items: const [
+          PopupMenuItem<String>(value: 'rename', child: Text('Rename')),
         ],
       );
 
       switch (action) {
         case 'rename':
           onRename();
-        case 'up':
-          onMoveUp();
-        case 'down':
-          onMoveDown();
         case null:
           break;
       }
@@ -686,11 +672,6 @@ class _AccountListTile extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        onLongPress: () async {
-          final box = context.findRenderObject() as RenderBox;
-          final center = box.localToGlobal(box.size.center(Offset.zero));
-          await openMenu(center);
-        },
         onSecondaryTapDown: (details) async {
           await openMenu(details.globalPosition);
         },
@@ -706,6 +687,7 @@ class _AccountListTile extends StatelessWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const Icon(Icons.drag_indicator),
               IconButton(
                 tooltip: 'More',
                 onPressed: () async {
