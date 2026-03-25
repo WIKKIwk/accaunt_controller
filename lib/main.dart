@@ -46,6 +46,16 @@ class ClashApp extends StatelessWidget {
               backgroundColor: palette.paper,
               foregroundColor: palette.ink,
             ),
+            cardTheme: CardThemeData(
+              color: lightScheme.surfaceContainerHigh,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(
+                  color: lightScheme.outline.withValues(alpha: 0.18),
+                ),
+              ),
+            ),
             useMaterial3: true,
           ),
           darkTheme: ThemeData(
@@ -54,6 +64,16 @@ class ClashApp extends StatelessWidget {
             appBarTheme: AppBarTheme(
               backgroundColor: palette.ink,
               foregroundColor: palette.paper,
+            ),
+            cardTheme: CardThemeData(
+              color: darkScheme.surfaceContainerLow,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(
+                  color: darkScheme.outline.withValues(alpha: 0.14),
+                ),
+              ),
             ),
             useMaterial3: true,
           ),
@@ -1604,23 +1624,23 @@ ColorScheme _buildLightColorScheme(AppPaletteData palette) {
     outline: palette.muted.withValues(alpha: 0.45),
     surfaceContainerLowest: const Color(0xFFFFFFFF),
     surfaceContainerLow: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.08),
+      palette.muted.withValues(alpha: 0.18),
       palette.paper,
     ),
     surfaceContainer: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.14),
+      palette.muted.withValues(alpha: 0.24),
       palette.paper,
     ),
     surfaceContainerHigh: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.20),
+      palette.muted.withValues(alpha: 0.30),
       palette.paper,
     ),
     surfaceContainerHighest: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.26),
+      palette.muted.withValues(alpha: 0.36),
       palette.paper,
     ),
     secondaryContainer: Color.alphaBlend(
-      palette.accent.withValues(alpha: 0.16),
+      palette.accent.withValues(alpha: 0.26),
       palette.paper,
     ),
   );
