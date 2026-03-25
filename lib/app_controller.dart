@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clash/models/codex_probe.dart';
 import 'package:clash/models/codex_profile.dart';
 import 'package:clash/services/codex_command_service.dart';
 import 'package:clash/services/profile_store.dart';
@@ -200,6 +201,13 @@ class AppController extends ChangeNotifier {
       await _persist(
         statusMessage: 'Updated "${profile.label}" from local Codex data.',
       );
+
+      if (_shouldSyncUsage(probe)) {
+        _statusMessage =
+            'Updated local data for "${profile.label}". Refreshing live limits in the background...';
+        notifyListeners();
+        unawaited(_syncProfileUsageInBackground(profile.id));
+      }
     });
   }
 
@@ -346,6 +354,47 @@ class AppController extends ChangeNotifier {
     } catch (_) {
       // Silent background refresh should not interrupt the main UI flow.
     }
+  }
+
+  Future<void> _syncProfileUsageInBackground(String profileId) async {
+    final profile = _findProfile(profileId);
+    if (profile == null) {
+      return;
+    }
+
+    try {
+      final probe = await _commandService.probeLogin(
+        profile,
+        refreshUsage: true,
+      );
+      _profiles = _profiles
+          .map(
+            (item) =>
+                item.id == profileId ? item.copyWith(lastProbe: probe) : item,
+          )
+          .toList();
+      await _profileStore.save(
+        activeProfileId: _activeProfileId,
+        profiles: _profiles,
+        themeModeName: _themeModeName(_themeMode),
+      );
+      _statusMessage = 'Live limits updated for "${profile.label}".';
+      notifyListeners();
+    } catch (_) {
+      // Best-effort background sync; keep the local snapshot if live sync fails.
+    }
+  }
+
+  bool _shouldSyncUsage(CodexProbe probe) {
+    if (!probe.isLoggedIn) {
+      return false;
+    }
+    final snapshot = probe.usageSnapshot;
+    if (snapshot == null) {
+      return true;
+    }
+    return DateTime.now().difference(snapshot.capturedAt) >
+        const Duration(minutes: 2);
   }
 
   void _startLoginWatch(String profileId) {
