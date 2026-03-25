@@ -13,15 +13,15 @@ class AppPaletteSwatch {
 }
 
 class AppPalette {
-  static const Color paper = Color(0xFFEEEEEE);
-  static const Color muted = Color(0xFF686D76);
-  static const Color ink = Color(0xFF373A40);
-  static const Color accent = Color(0xFFDC5F00);
+  static const Color paper = Color(0xFFF4EEFF);
+  static const Color mist = Color(0xFFDCD6F7);
+  static const Color sky = Color(0xFFA6B1E1);
+  static const Color ink = Color(0xFF424874);
 
   static const List<AppPaletteSwatch> swatches = [
-    AppPaletteSwatch(label: 'Grey', hexLabel: '#EEEEEE', color: paper),
-    AppPaletteSwatch(label: 'Retro', hexLabel: '#686D76', color: muted),
-    AppPaletteSwatch(label: 'Black', hexLabel: '#373A40', color: ink),
-    AppPaletteSwatch(label: 'Orange', hexLabel: '#DC5F00', color: accent),
+    AppPaletteSwatch(label: 'Paper', hexLabel: '#F4EEFF', color: paper),
+    AppPaletteSwatch(label: 'Mist', hexLabel: '#DCD6F7', color: mist),
+    AppPaletteSwatch(label: 'Sky', hexLabel: '#A6B1E1', color: sky),
+    AppPaletteSwatch(label: 'Ink', hexLabel: '#424874', color: ink),
   ];
 }

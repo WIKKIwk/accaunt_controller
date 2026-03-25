@@ -1601,52 +1601,52 @@ enum BannerTone { info, error }
 
 ColorScheme _buildLightColorScheme() {
   final base = ColorScheme.fromSeed(
-    seedColor: AppPalette.accent,
+    seedColor: AppPalette.sky,
     brightness: Brightness.light,
   );
 
   return base.copyWith(
-    primary: AppPalette.accent,
+    primary: AppPalette.ink,
     onPrimary: AppPalette.paper,
-    secondary: AppPalette.muted,
+    secondary: AppPalette.sky,
     onSecondary: AppPalette.paper,
-    tertiary: AppPalette.ink,
+    tertiary: AppPalette.mist,
     onTertiary: AppPalette.paper,
     surface: AppPalette.paper,
     onSurface: AppPalette.ink,
-    onSurfaceVariant: AppPalette.muted,
-    outline: AppPalette.muted.withValues(alpha: 0.45),
+    onSurfaceVariant: AppPalette.ink.withValues(alpha: 0.72),
+    outline: AppPalette.sky.withValues(alpha: 0.45),
     surfaceContainerLowest: const Color(0xFFFFFFFF),
-    surfaceContainerLow: const Color(0xFFF7F7F7),
-    surfaceContainer: const Color(0xFFF0F0F0),
-    surfaceContainerHigh: const Color(0xFFE8E8E8),
-    surfaceContainerHighest: const Color(0xFFE1E1E1),
-    secondaryContainer: const Color(0xFFD9DDE3),
+    surfaceContainerLow: const Color(0xFFF8F4FF),
+    surfaceContainer: const Color(0xFFF1EBFC),
+    surfaceContainerHigh: const Color(0xFFEAE3FA),
+    surfaceContainerHighest: const Color(0xFFE2DAF6),
+    secondaryContainer: const Color(0xFFD8D0F2),
   );
 }
 
 ColorScheme _buildDarkColorScheme() {
   final base = ColorScheme.fromSeed(
-    seedColor: AppPalette.accent,
+    seedColor: AppPalette.sky,
     brightness: Brightness.dark,
   );
 
   return base.copyWith(
-    primary: AppPalette.accent,
-    onPrimary: AppPalette.paper,
-    secondary: AppPalette.muted,
-    onSecondary: AppPalette.paper,
+    primary: AppPalette.mist,
+    onPrimary: AppPalette.ink,
+    secondary: AppPalette.sky,
+    onSecondary: AppPalette.ink,
     tertiary: AppPalette.paper,
     onTertiary: AppPalette.ink,
     surface: AppPalette.ink,
     onSurface: AppPalette.paper,
-    onSurfaceVariant: const Color(0xFFC1C5CC),
-    outline: AppPalette.muted,
-    surfaceContainerLowest: const Color(0xFF23262B),
-    surfaceContainerLow: const Color(0xFF2B2F35),
-    surfaceContainer: const Color(0xFF333840),
-    surfaceContainerHigh: const Color(0xFF3A4049),
-    surfaceContainerHighest: const Color(0xFF434A54),
-    secondaryContainer: const Color(0xFF4A515B),
+    onSurfaceVariant: const Color(0xFFD8D0F2),
+    outline: AppPalette.sky.withValues(alpha: 0.6),
+    surfaceContainerLowest: const Color(0xFF32365A),
+    surfaceContainerLow: const Color(0xFF383D63),
+    surfaceContainer: const Color(0xFF3D426A),
+    surfaceContainerHigh: const Color(0xFF444872),
+    surfaceContainerHighest: const Color(0xFF4D5380),
+    secondaryContainer: const Color(0xFF596295),
   );
 }
