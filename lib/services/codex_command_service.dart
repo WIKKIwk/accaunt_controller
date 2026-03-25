@@ -190,9 +190,10 @@ class CodexCommandService {
     await Process.run('codex', [
       'exec',
       '--skip-git-repo-check',
+      '--json',
       '-C',
       homeDir,
-      '/status',
+      'Reply with exactly ok',
     ], environment: _environmentFor(profile));
   }
 
