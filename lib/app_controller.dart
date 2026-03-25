@@ -21,6 +21,7 @@ class AppController extends ChangeNotifier {
   Timer? _loginWatchTimer;
   final Map<String, StreamSubscription<FileSystemEvent>> _profileWatchers = {};
   final Map<String, Timer> _watchDebounceTimers = {};
+  bool _isBootstrappingLive = false;
   ThemeMode _themeMode = ThemeMode.dark;
   bool _isLoading = true;
   bool _isBusy = false;
@@ -61,6 +62,7 @@ class AppController extends ChangeNotifier {
       if (initialProfile != null) {
         unawaited(_refreshProfileSilently(initialProfile.id));
       }
+      unawaited(_bootstrapLiveLimits());
     } catch (error) {
       _errorMessage = error.toString();
     } finally {
@@ -215,17 +217,8 @@ class AppController extends ChangeNotifier {
     }
 
     await _runGuarded(() async {
-      final probe = await _commandService.probeLogin(
-        profile,
-        refreshUsage: true,
-      );
-      _profiles = _profiles
-          .map(
-            (item) =>
-                item.id == profile.id ? item.copyWith(lastProbe: probe) : item,
-          )
-          .toList();
-      await _persist(
+      await _syncProfileUsageNow(
+        profileId: profile.id,
         statusMessage:
             'Synced "${profile.label}" limits from Codex. This can take a few seconds.',
       );
@@ -384,6 +377,63 @@ class AppController extends ChangeNotifier {
     } catch (_) {
       // Silent background refresh should not interrupt the main UI flow.
     }
+  }
+
+  Future<void> _syncProfileUsageNow({
+    required String profileId,
+    String? statusMessage,
+  }) async {
+    final profile = _findProfile(profileId);
+    if (profile == null) {
+      return;
+    }
+
+    final probe = await _commandService.probeLogin(profile, refreshUsage: true);
+    _profiles = _profiles
+        .map(
+          (item) =>
+              item.id == profileId ? item.copyWith(lastProbe: probe) : item,
+        )
+        .toList();
+    await _persist(statusMessage: statusMessage);
+  }
+
+  Future<void> _bootstrapLiveLimits() async {
+    if (_isBootstrappingLive || _profiles.isEmpty) {
+      return;
+    }
+
+    _isBootstrappingLive = true;
+    try {
+      for (final profile in List<CodexProfile>.from(_profiles)) {
+        if (!_shouldBootstrapProfile(profile)) {
+          continue;
+        }
+        try {
+          await _syncProfileUsageNow(profileId: profile.id);
+        } catch (_) {
+          // Best-effort startup sync; keep going for the remaining profiles.
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
+      _statusMessage = 'Live limits refreshed on startup.';
+      notifyListeners();
+    } finally {
+      _isBootstrappingLive = false;
+    }
+  }
+
+  bool _shouldBootstrapProfile(CodexProfile profile) {
+    final probe = profile.lastProbe;
+    if (probe == null || !probe.isLoggedIn) {
+      return true;
+    }
+    final snapshot = probe.usageSnapshot;
+    if (snapshot == null) {
+      return true;
+    }
+    return DateTime.now().difference(snapshot.capturedAt) >
+        const Duration(minutes: 5);
   }
 
   void _startLoginWatch(String profileId) {
