@@ -541,13 +541,20 @@ class _AccountsWorkspace extends StatelessWidget {
       );
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(width: 320, child: _AccountsListCard(controller: controller)),
-        const SizedBox(width: 24),
-        Expanded(child: _AccountDetailCard(controller: controller)),
-      ],
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 320,
+            child: _AccountsListCard(controller: controller),
+          ),
+          VerticalDivider(width: 1, thickness: 1),
+          Expanded(child: _AccountDetailCard(controller: controller)),
+        ],
+      ),
     );
   }
 }
@@ -564,8 +571,6 @@ class _AccountsListCard extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: scheme.surfaceContainerLow,
-      clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -723,8 +728,6 @@ class _AccountDetailCard extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: scheme.surfaceContainerLow,
-      clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
