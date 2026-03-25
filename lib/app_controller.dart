@@ -84,8 +84,7 @@ class AppController extends ChangeNotifier {
       notes: notes?.trim().isEmpty ?? true ? null : notes?.trim(),
     );
 
-    _profiles = [..._profiles, profile]
-      ..sort((left, right) => left.label.compareTo(right.label));
+    _profiles = [..._profiles, profile];
     _activeProfileId = profile.id;
     await _persist(statusMessage: 'Created profile "${profile.label}".');
   }
@@ -108,19 +107,43 @@ class AppController extends ChangeNotifier {
       return;
     }
 
-    _profiles =
-        _profiles
-            .map(
-              (item) => item.id == profileId
-                  ? item.copyWith(label: normalizedLabel)
-                  : item,
-            )
-            .toList()
-          ..sort((left, right) => left.label.compareTo(right.label));
+    _profiles = _profiles
+        .map(
+          (item) => item.id == profileId
+              ? item.copyWith(label: normalizedLabel)
+              : item,
+        )
+        .toList();
 
     await _persist(
       statusMessage: 'Renamed "${profile.label}" to "$normalizedLabel".',
     );
+  }
+
+  Future<void> moveProfileUp(String profileId) async {
+    final index = _profiles.indexWhere((profile) => profile.id == profileId);
+    if (index <= 0) {
+      return;
+    }
+
+    final reordered = [..._profiles];
+    final current = reordered.removeAt(index);
+    reordered.insert(index - 1, current);
+    _profiles = reordered;
+    await _persist(statusMessage: 'Moved "${current.label}" up.');
+  }
+
+  Future<void> moveProfileDown(String profileId) async {
+    final index = _profiles.indexWhere((profile) => profile.id == profileId);
+    if (index == -1 || index >= _profiles.length - 1) {
+      return;
+    }
+
+    final reordered = [..._profiles];
+    final current = reordered.removeAt(index);
+    reordered.insert(index + 1, current);
+    _profiles = reordered;
+    await _persist(statusMessage: 'Moved "${current.label}" down.');
   }
 
   Future<String> suggestCodexHome(String label) {

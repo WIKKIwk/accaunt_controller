@@ -25,12 +25,10 @@ class ProfileStore {
     }
 
     final json = jsonDecode(raw) as Map<String, dynamic>;
-    final profileItems =
-        (json['profiles'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(CodexProfile.fromJson)
-            .toList()
-          ..sort((left, right) => left.label.compareTo(right.label));
+    final profileItems = (json['profiles'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(CodexProfile.fromJson)
+        .toList();
 
     return StoredProfiles(
       activeProfileId: json['activeProfileId'] as String?,

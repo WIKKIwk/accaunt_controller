@@ -590,6 +590,10 @@ class _AccountsListCard extends StatelessWidget {
                     onTap: () => controller.selectProfile(profile.id),
                     onRename: () =>
                         _showRenameProfileDialog(context, controller, profile),
+                    canMoveUp: index > 0,
+                    canMoveDown: index < controller.profiles.length - 1,
+                    onMoveUp: () => controller.moveProfileUp(profile.id),
+                    onMoveDown: () => controller.moveProfileDown(profile.id),
                   );
                 },
                 separatorBuilder: (context, index) =>
@@ -617,43 +621,105 @@ class _AccountListTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onRename,
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.onMoveUp,
+    required this.onMoveDown,
   });
 
   final CodexProfile profile;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onRename;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final probe = profile.lastProbe;
 
+    Future<void> openMenu(Offset globalPosition) async {
+      final overlay =
+          Overlay.of(context).context.findRenderObject() as RenderBox;
+      final position = RelativeRect.fromRect(
+        Rect.fromPoints(globalPosition, globalPosition),
+        Offset.zero & overlay.size,
+      );
+
+      final action = await showMenu<String>(
+        context: context,
+        position: position,
+        items: [
+          const PopupMenuItem<String>(value: 'rename', child: Text('Rename')),
+          PopupMenuItem<String>(
+            value: 'up',
+            enabled: canMoveUp,
+            child: const Text('Move up'),
+          ),
+          PopupMenuItem<String>(
+            value: 'down',
+            enabled: canMoveDown,
+            child: const Text('Move down'),
+          ),
+        ],
+      );
+
+      switch (action) {
+        case 'rename':
+          onRename();
+        case 'up':
+          onMoveUp();
+        case 'down':
+          onMoveDown();
+        case null:
+          break;
+      }
+    }
+
     return Card(
       elevation: 0,
       color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      child: ListTile(
+      child: InkWell(
         onTap: onTap,
-        title: Text(profile.label),
-        subtitle: Text(
-          probe == null
-              ? 'Checking...'
-              : probe.isLoggedIn
-              ? 'Signed in'
-              : 'Not signed in',
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              tooltip: 'Rename',
-              onPressed: onRename,
-              icon: const Icon(Icons.edit_outlined),
-            ),
-            const Icon(Icons.chevron_right),
-          ],
+        onLongPress: () async {
+          final box = context.findRenderObject() as RenderBox;
+          final center = box.localToGlobal(box.size.center(Offset.zero));
+          await openMenu(center);
+        },
+        onSecondaryTapDown: (details) async {
+          await openMenu(details.globalPosition);
+        },
+        child: ListTile(
+          title: Text(profile.label),
+          subtitle: Text(
+            probe == null
+                ? 'Checking...'
+                : probe.isLoggedIn
+                ? 'Signed in'
+                : 'Not signed in',
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'More',
+                onPressed: () async {
+                  final box = context.findRenderObject() as RenderBox;
+                  final center = box.localToGlobal(
+                    box.size.center(Offset.zero),
+                  );
+                  await openMenu(center);
+                },
+                icon: const Icon(Icons.more_vert),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
         ),
       ),
     );
