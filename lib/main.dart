@@ -871,11 +871,6 @@ class _AccountDetailCard extends StatelessWidget {
                                 ? Icons.check_circle_outline
                                 : Icons.info_outline,
                           ),
-                          if (_compactLimitSummary(probe) case final summary?)
-                            _StatusChip(
-                              label: summary,
-                              icon: Icons.timelapse_rounded,
-                            ),
                         ],
                       ),
                     ],
