@@ -222,7 +222,7 @@ class _NavigationPanel extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: scheme.surfaceContainerLow,
+      color: _panelSurface(scheme),
       clipBehavior: Clip.antiAlias,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -310,7 +310,7 @@ class _ModuleTile extends StatelessWidget {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        color: selected ? scheme.secondaryContainer : Colors.transparent,
+        color: selected ? _selectedPanelSurface(scheme) : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Material(
@@ -412,7 +412,7 @@ class _HomeDashboard extends StatelessWidget {
               const SizedBox(height: 20),
               Card(
                 elevation: 0,
-                color: scheme.surfaceContainerLow,
+                color: _panelSurface(scheme),
                 clipBehavior: Clip.antiAlias,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -825,7 +825,7 @@ class _AccountListTile extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
+      color: selected ? _selectedPanelSurface(scheme) : _itemSurface(scheme),
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1054,7 +1054,7 @@ class _SettingsWorkspace extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 840),
         child: Card(
           elevation: 0,
-          color: scheme.surfaceContainerLow,
+          color: _panelSurface(scheme),
           clipBehavior: Clip.antiAlias,
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -1391,7 +1391,7 @@ class _EmptyModuleState extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 520),
         child: Card(
           elevation: 0,
-          color: scheme.surfaceContainerLow,
+          color: _panelSurface(scheme),
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
@@ -1737,4 +1737,22 @@ Color _tone(Color color, double lightness, {double? saturation}) {
 
 Color _mix(Color base, Color overlay, double amount) {
   return Color.alphaBlend(overlay.withValues(alpha: amount), base);
+}
+
+Color _panelSurface(ColorScheme scheme) {
+  return scheme.brightness == Brightness.light
+      ? scheme.surfaceContainerHighest
+      : scheme.surfaceContainerLow;
+}
+
+Color _itemSurface(ColorScheme scheme) {
+  return scheme.brightness == Brightness.light
+      ? scheme.surfaceContainerHigh
+      : scheme.surfaceContainer;
+}
+
+Color _selectedPanelSurface(ColorScheme scheme) {
+  return scheme.brightness == Brightness.light
+      ? scheme.secondaryContainer
+      : scheme.secondaryContainer;
 }
