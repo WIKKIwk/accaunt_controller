@@ -1,4 +1,5 @@
 import 'package:clash/app_controller.dart';
+import 'package:clash/models/app_color_style.dart';
 import 'package:clash/models/codex_probe.dart';
 import 'package:clash/models/codex_profile.dart';
 import 'package:clash/models/codex_usage_snapshot.dart';
@@ -28,12 +29,13 @@ class ClashApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        final seed = controller.colorStyle.data.seedColor;
         final lightScheme = ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4D7C99),
+          seedColor: seed,
           brightness: Brightness.light,
         );
         final darkScheme = ColorScheme.fromSeed(
-          seedColor: const Color(0xFF84C7F2),
+          seedColor: seed,
           brightness: Brightness.dark,
         );
 
@@ -1005,6 +1007,36 @@ class _SettingsWorkspace extends StatelessWidget {
                             ThemeMode.dark => 'Dark',
                             ThemeMode.system => 'Follow system',
                           }),
+                        ),
+                        const SizedBox(height: 20),
+                        Text('Color style', style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Pick the accent palette used by the app.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            for (final style in AppColorStyle.values)
+                              ChoiceChip(
+                                selected: controller.colorStyle == style,
+                                onSelected: (_) async {
+                                  await controller.setColorStyle(style);
+                                },
+                                avatar: CircleAvatar(
+                                  radius: 10,
+                                  backgroundColor: style.data.seedColor,
+                                ),
+                                label: Text(
+                                  '${style.data.label}  ${style.data.hexLabel}',
+                                ),
+                              ),
+                          ],
                         ),
                       ],
                     ),

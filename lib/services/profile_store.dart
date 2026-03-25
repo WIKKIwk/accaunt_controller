@@ -10,11 +10,13 @@ class StoredProfiles {
     required this.activeProfileId,
     required this.profiles,
     required this.themeModeName,
+    required this.colorStyleName,
   });
 
   final String? activeProfileId;
   final List<CodexProfile> profiles;
   final String themeModeName;
+  final String colorStyleName;
 }
 
 class ProfileStore {
@@ -25,6 +27,7 @@ class ProfileStore {
         activeProfileId: null,
         profiles: [],
         themeModeName: 'dark',
+        colorStyleName: 'orange',
       );
     }
 
@@ -34,6 +37,7 @@ class ProfileStore {
         activeProfileId: null,
         profiles: [],
         themeModeName: 'dark',
+        colorStyleName: 'orange',
       );
     }
 
@@ -47,6 +51,7 @@ class ProfileStore {
       activeProfileId: json['activeProfileId'] as String?,
       profiles: profileItems,
       themeModeName: (json['themeMode'] as String?) ?? 'dark',
+      colorStyleName: (json['colorStyle'] as String?) ?? 'orange',
     );
   }
 
@@ -54,6 +59,7 @@ class ProfileStore {
     required String? activeProfileId,
     required List<CodexProfile> profiles,
     required String themeModeName,
+    required String colorStyleName,
   }) async {
     final file = await _profilesFile();
     await file.parent.create(recursive: true);
@@ -61,6 +67,7 @@ class ProfileStore {
     final payload = {
       'activeProfileId': activeProfileId,
       'themeMode': themeModeName,
+      'colorStyle': colorStyleName,
       'profiles': profiles.map((profile) => profile.toJson()).toList(),
     };
 
