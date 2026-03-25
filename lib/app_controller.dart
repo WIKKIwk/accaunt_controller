@@ -90,6 +90,39 @@ class AppController extends ChangeNotifier {
     await _persist(statusMessage: 'Created profile "${profile.label}".');
   }
 
+  Future<void> renameProfile({
+    required String profileId,
+    required String label,
+  }) async {
+    final normalizedLabel = label.trim();
+    if (normalizedLabel.isEmpty) {
+      _errorMessage = 'Profile name cannot be empty.';
+      notifyListeners();
+      return;
+    }
+
+    final profile = _findProfile(profileId);
+    if (profile == null) {
+      _errorMessage = 'Profile not found.';
+      notifyListeners();
+      return;
+    }
+
+    _profiles =
+        _profiles
+            .map(
+              (item) => item.id == profileId
+                  ? item.copyWith(label: normalizedLabel)
+                  : item,
+            )
+            .toList()
+          ..sort((left, right) => left.label.compareTo(right.label));
+
+    await _persist(
+      statusMessage: 'Renamed "${profile.label}" to "$normalizedLabel".',
+    );
+  }
+
   Future<String> suggestCodexHome(String label) {
     return _profileStore.defaultCodexHomeForLabel(label);
   }

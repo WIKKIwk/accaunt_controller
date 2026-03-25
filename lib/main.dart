@@ -588,6 +588,8 @@ class _AccountsListCard extends StatelessWidget {
                     profile: profile,
                     selected: controller.activeProfile?.id == profile.id,
                     onTap: () => controller.selectProfile(profile.id),
+                    onRename: () =>
+                        _showRenameProfileDialog(context, controller, profile),
                   );
                 },
                 separatorBuilder: (context, index) =>
@@ -614,11 +616,13 @@ class _AccountListTile extends StatelessWidget {
     required this.profile,
     required this.selected,
     required this.onTap,
+    required this.onRename,
   });
 
   final CodexProfile profile;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onRename;
 
   @override
   Widget build(BuildContext context) {
@@ -640,7 +644,17 @@ class _AccountListTile extends StatelessWidget {
               ? 'Signed in'
               : 'Not signed in',
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Rename',
+              onPressed: onRename,
+              icon: const Icon(Icons.edit_outlined),
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }
@@ -675,9 +689,24 @@ class _AccountDetailCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        profile.label,
-                        style: theme.textTheme.headlineMedium,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              profile.label,
+                              style: theme.textTheme.headlineMedium,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Rename account',
+                            onPressed: () => _showRenameProfileDialog(
+                              context,
+                              controller,
+                              profile,
+                            ),
+                            icon: const Icon(Icons.edit_outlined),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Wrap(
@@ -1139,6 +1168,46 @@ Future<void> _showAddProfileDialog(
             ],
           );
         },
+      );
+    },
+  );
+}
+
+Future<void> _showRenameProfileDialog(
+  BuildContext context,
+  AppController controller,
+  CodexProfile profile,
+) async {
+  final labelController = TextEditingController(text: profile.label);
+
+  await showDialog<void>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Rename account'),
+        content: TextField(
+          controller: labelController,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Account name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await controller.renameProfile(
+                profileId: profile.id,
+                label: labelController.text,
+              );
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
       );
     },
   );
