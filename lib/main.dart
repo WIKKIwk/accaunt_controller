@@ -41,10 +41,10 @@ class ClashApp extends StatelessWidget {
           themeAnimationCurve: Curves.easeInOutCubicEmphasized,
           theme: ThemeData(
             colorScheme: lightScheme,
-            scaffoldBackgroundColor: palette.paper,
+            scaffoldBackgroundColor: lightScheme.surface,
             appBarTheme: AppBarTheme(
-              backgroundColor: palette.paper,
-              foregroundColor: palette.ink,
+              backgroundColor: lightScheme.surface,
+              foregroundColor: lightScheme.onSurface,
             ),
             cardTheme: CardThemeData(
               color: lightScheme.surfaceContainerHigh,
@@ -60,10 +60,10 @@ class ClashApp extends StatelessWidget {
           ),
           darkTheme: ThemeData(
             colorScheme: darkScheme,
-            scaffoldBackgroundColor: palette.ink,
+            scaffoldBackgroundColor: darkScheme.surface,
             appBarTheme: AppBarTheme(
-              backgroundColor: palette.ink,
-              foregroundColor: palette.paper,
+              backgroundColor: darkScheme.surface,
+              foregroundColor: darkScheme.onSurface,
             ),
             cardTheme: CardThemeData(
               color: darkScheme.surfaceContainerLow,
@@ -1607,85 +1607,74 @@ enum BannerTone { info, error }
 
 ColorScheme _buildLightColorScheme(AppPaletteData palette) {
   final base = ColorScheme.fromSeed(
-    seedColor: palette.accent,
+    seedColor: _tone(palette.accent, 0.52),
     brightness: Brightness.light,
   );
+  final surface = _tone(palette.paper, 0.97, saturation: 0.22);
+  final onSurface = _tone(palette.ink, 0.18, saturation: 0.28);
+  final primary = _tone(palette.ink, 0.34, saturation: 0.34);
+  final secondary = _tone(palette.accent, 0.58, saturation: 0.30);
+  final tertiary = _tone(palette.muted, 0.52, saturation: 0.22);
 
   return base.copyWith(
-    primary: palette.ink,
-    onPrimary: palette.paper,
-    secondary: palette.accent,
-    onSecondary: palette.paper,
-    tertiary: palette.muted,
-    onTertiary: palette.paper,
-    surface: palette.paper,
-    onSurface: palette.ink,
-    onSurfaceVariant: palette.ink.withValues(alpha: 0.72),
-    outline: palette.muted.withValues(alpha: 0.45),
+    primary: primary,
+    onPrimary: surface,
+    secondary: secondary,
+    onSecondary: Colors.white,
+    tertiary: tertiary,
+    onTertiary: Colors.white,
+    surface: surface,
+    onSurface: onSurface,
+    onSurfaceVariant: onSurface.withValues(alpha: 0.74),
+    outline: secondary.withValues(alpha: 0.28),
     surfaceContainerLowest: const Color(0xFFFFFFFF),
-    surfaceContainerLow: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.18),
-      palette.paper,
-    ),
-    surfaceContainer: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.24),
-      palette.paper,
-    ),
-    surfaceContainerHigh: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.30),
-      palette.paper,
-    ),
-    surfaceContainerHighest: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.36),
-      palette.paper,
-    ),
-    secondaryContainer: Color.alphaBlend(
-      palette.accent.withValues(alpha: 0.26),
-      palette.paper,
-    ),
+    surfaceContainerLow: _mix(surface, palette.muted, 0.08),
+    surfaceContainer: _mix(surface, palette.muted, 0.12),
+    surfaceContainerHigh: _mix(surface, palette.muted, 0.18),
+    surfaceContainerHighest: _mix(surface, palette.muted, 0.24),
+    secondaryContainer: _mix(surface, palette.accent, 0.18),
   );
 }
 
 ColorScheme _buildDarkColorScheme(AppPaletteData palette) {
   final base = ColorScheme.fromSeed(
-    seedColor: palette.accent,
+    seedColor: _tone(palette.accent, 0.58),
     brightness: Brightness.dark,
   );
+  final surface = _tone(palette.ink, 0.14, saturation: 0.18);
+  final onSurface = _tone(palette.paper, 0.94, saturation: 0.18);
+  final primary = _tone(palette.accent, 0.78, saturation: 0.26);
+  final secondary = _tone(palette.muted, 0.72, saturation: 0.20);
+  final tertiary = _tone(palette.paper, 0.84, saturation: 0.18);
 
   return base.copyWith(
-    primary: palette.paper,
-    onPrimary: palette.ink,
-    secondary: palette.accent,
-    onSecondary: palette.paper,
-    tertiary: palette.muted,
-    onTertiary: palette.paper,
-    surface: palette.ink,
-    onSurface: palette.paper,
-    onSurfaceVariant: palette.paper.withValues(alpha: 0.74),
-    outline: palette.muted.withValues(alpha: 0.6),
-    surfaceContainerLowest: Color.alphaBlend(
-      Colors.black.withValues(alpha: 0.18),
-      palette.ink,
-    ),
-    surfaceContainerLow: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.10),
-      palette.ink,
-    ),
-    surfaceContainer: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.16),
-      palette.ink,
-    ),
-    surfaceContainerHigh: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.22),
-      palette.ink,
-    ),
-    surfaceContainerHighest: Color.alphaBlend(
-      palette.muted.withValues(alpha: 0.28),
-      palette.ink,
-    ),
-    secondaryContainer: Color.alphaBlend(
-      palette.accent.withValues(alpha: 0.18),
-      palette.ink,
-    ),
+    primary: primary,
+    onPrimary: _tone(palette.ink, 0.18, saturation: 0.16),
+    secondary: secondary,
+    onSecondary: _tone(palette.ink, 0.18, saturation: 0.16),
+    tertiary: tertiary,
+    onTertiary: _tone(palette.ink, 0.18, saturation: 0.16),
+    surface: surface,
+    onSurface: onSurface,
+    onSurfaceVariant: onSurface.withValues(alpha: 0.76),
+    outline: secondary.withValues(alpha: 0.34),
+    surfaceContainerLowest: _mix(surface, Colors.black, 0.12),
+    surfaceContainerLow: _mix(surface, palette.muted, 0.08),
+    surfaceContainer: _mix(surface, palette.muted, 0.12),
+    surfaceContainerHigh: _mix(surface, palette.muted, 0.16),
+    surfaceContainerHighest: _mix(surface, palette.muted, 0.20),
+    secondaryContainer: _mix(surface, palette.accent, 0.14),
   );
+}
+
+Color _tone(Color color, double lightness, {double? saturation}) {
+  final hsl = HSLColor.fromColor(color);
+  return hsl
+      .withLightness(lightness.clamp(0.0, 1.0))
+      .withSaturation((saturation ?? hsl.saturation).clamp(0.0, 1.0))
+      .toColor();
+}
+
+Color _mix(Color base, Color overlay, double amount) {
+  return Color.alphaBlend(overlay.withValues(alpha: amount), base);
 }
