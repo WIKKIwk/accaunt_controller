@@ -36,6 +36,8 @@ class ClashApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           title: 'Codex Clash',
           themeMode: controller.themeMode,
+          themeAnimationDuration: const Duration(milliseconds: 280),
+          themeAnimationCurve: Curves.easeInOutCubicEmphasized,
           theme: ThemeData(
             colorScheme: lightScheme,
             scaffoldBackgroundColor: AppPalette.paper,
@@ -104,13 +106,26 @@ class _ClashHomePageState extends State<ClashHomePage> {
                               _section = section;
                             });
                           },
-                          onAddAccount: () =>
-                              _showAddProfileDialog(context, widget.controller),
                         ),
                         const SizedBox(width: 24),
                         Expanded(
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 220),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) {
+                              final slide = Tween<Offset>(
+                                begin: const Offset(0.03, 0),
+                                end: Offset.zero,
+                              ).animate(animation);
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: slide,
+                                  child: child,
+                                ),
+                              );
+                            },
                             child: switch (_section) {
                               AppSection.home => _HomeDashboard(
                                 key: const ValueKey('home'),
@@ -157,14 +172,12 @@ class _NavigationPanel extends StatelessWidget {
     required this.currentSection,
     required this.onToggleExpanded,
     required this.onSectionSelected,
-    required this.onAddAccount,
   });
 
   final bool expanded;
   final AppSection currentSection;
   final VoidCallback onToggleExpanded;
   final ValueChanged<AppSection> onSectionSelected;
-  final VoidCallback onAddAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -194,39 +207,36 @@ class _NavigationPanel extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         width: expanded ? 232 : 84,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: expanded
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: onToggleExpanded,
-                    icon: Icon(expanded ? Icons.menu_open : Icons.menu),
-                    tooltip: expanded ? 'Collapse menu' : 'Expand menu',
-                  ),
-                  if (expanded) ...[
-                    const SizedBox(width: 4),
-                    Text('Modules', style: theme.textTheme.titleMedium),
-                  ],
-                ],
+              padding: EdgeInsets.fromLTRB(
+                expanded ? 12 : 0,
+                12,
+                expanded ? 12 : 0,
+                8,
               ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 10),
               child: expanded
-                  ? FilledButton.tonalIcon(
-                      onPressed: onAddAccount,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add account'),
+                  ? Row(
+                      children: [
+                        IconButton(
+                          onPressed: onToggleExpanded,
+                          icon: Icon(expanded ? Icons.menu_open : Icons.menu),
+                          tooltip: expanded ? 'Collapse menu' : 'Expand menu',
+                        ),
+                        const SizedBox(width: 4),
+                        Text('Modules', style: theme.textTheme.titleMedium),
+                      ],
                     )
-                  : IconButton.filledTonal(
-                      onPressed: onAddAccount,
-                      tooltip: 'Add account',
-                      icon: const Icon(Icons.add),
+                  : IconButton(
+                      onPressed: onToggleExpanded,
+                      icon: const Icon(Icons.menu),
+                      tooltip: 'Expand menu',
                     ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: expanded ? 12 : 8),
@@ -275,44 +285,63 @@ class _ModuleTile extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Material(
-      color: selected ? scheme.secondaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        color: selected ? scheme.secondaryContainer : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          height: 56,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 0),
-            child: expanded
-                ? Row(
-                    children: [
-                      Icon(
-                        icon,
-                        color: selected
-                            ? scheme.onSecondaryContainer
-                            : scheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        label,
-                        style: theme.textTheme.titleMedium?.copyWith(
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            height: 56,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 0),
+              child: expanded
+                  ? Row(
+                      children: [
+                        AnimatedScale(
+                          duration: const Duration(milliseconds: 180),
+                          scale: selected ? 1.06 : 1,
+                          child: Icon(
+                            icon,
+                            color: selected
+                                ? scheme.onSecondaryContainer
+                                : scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 180),
+                          style:
+                              theme.textTheme.titleMedium?.copyWith(
+                                color: selected
+                                    ? scheme.onSecondaryContainer
+                                    : scheme.onSurface,
+                              ) ??
+                              const TextStyle(),
+                          child: Text(label),
+                        ),
+                      ],
+                    )
+                  : Center(
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 180),
+                        scale: selected ? 1.06 : 1,
+                        child: Icon(
+                          icon,
                           color: selected
                               ? scheme.onSecondaryContainer
-                              : scheme.onSurface,
+                              : scheme.onSurfaceVariant,
                         ),
                       ),
-                    ],
-                  )
-                : Center(
-                    child: Icon(
-                      icon,
-                      color: selected
-                          ? scheme.onSecondaryContainer
-                          : scheme.onSurfaceVariant,
                     ),
-                  ),
+            ),
           ),
         ),
       ),
@@ -602,10 +631,17 @@ class _DashboardLimitRow extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: window.remainingPercent / 100,
-          minHeight: 8,
-          borderRadius: BorderRadius.circular(999),
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: window.remainingPercent / 100),
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) {
+            return LinearProgressIndicator(
+              value: value,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(999),
+            );
+          },
         ),
       ],
     );
@@ -646,7 +682,10 @@ class _AccountsWorkspace extends StatelessWidget {
         children: [
           SizedBox(
             width: 320,
-            child: _AccountsListCard(controller: controller),
+            child: _AccountsListCard(
+              controller: controller,
+              onAddAccount: onAddAccount,
+            ),
           ),
           VerticalDivider(width: 1, thickness: 1),
           Expanded(child: _AccountDetailCard(controller: controller)),
@@ -657,9 +696,13 @@ class _AccountsWorkspace extends StatelessWidget {
 }
 
 class _AccountsListCard extends StatelessWidget {
-  const _AccountsListCard({required this.controller});
+  const _AccountsListCard({
+    required this.controller,
+    required this.onAddAccount,
+  });
 
   final AppController controller;
+  final VoidCallback onAddAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -673,7 +716,18 @@ class _AccountsListCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Accounts', style: theme.textTheme.titleLarge),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Accounts', style: theme.textTheme.titleLarge),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: onAddAccount,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add'),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             Text(
               'Select a profile to manage its login and limits.',
