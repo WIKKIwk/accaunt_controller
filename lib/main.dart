@@ -1610,7 +1610,7 @@ ColorScheme _buildLightColorScheme(AppPaletteData palette) {
     seedColor: _tone(palette.accent, 0.52),
     brightness: Brightness.light,
   );
-  final surface = _tone(palette.paper, 0.97, saturation: 0.22);
+  final surface = _tone(palette.paper, 0.992, saturation: 0.14);
   final onSurface = _tone(palette.ink, 0.18, saturation: 0.28);
   final primary = _tone(palette.ink, 0.34, saturation: 0.34);
   final secondary = _tone(palette.accent, 0.58, saturation: 0.30);
@@ -1628,11 +1628,11 @@ ColorScheme _buildLightColorScheme(AppPaletteData palette) {
     onSurfaceVariant: onSurface.withValues(alpha: 0.74),
     outline: secondary.withValues(alpha: 0.28),
     surfaceContainerLowest: const Color(0xFFFFFFFF),
-    surfaceContainerLow: _mix(surface, palette.muted, 0.08),
-    surfaceContainer: _mix(surface, palette.muted, 0.12),
-    surfaceContainerHigh: _mix(surface, palette.muted, 0.18),
-    surfaceContainerHighest: _mix(surface, palette.muted, 0.24),
-    secondaryContainer: _mix(surface, palette.accent, 0.18),
+    surfaceContainerLow: _mix(surface, palette.ink, 0.03),
+    surfaceContainer: _mix(surface, palette.muted, 0.10),
+    surfaceContainerHigh: _mix(surface, palette.ink, 0.08),
+    surfaceContainerHighest: _mix(surface, palette.ink, 0.12),
+    secondaryContainer: _mix(surface, palette.accent, 0.24),
   );
 }
 
