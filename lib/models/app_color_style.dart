@@ -12,16 +12,64 @@ class AppPaletteSwatch {
   final Color color;
 }
 
-class AppPalette {
-  static const Color paper = Color(0xFFF4EEFF);
-  static const Color mist = Color(0xFFDCD6F7);
-  static const Color sky = Color(0xFFA6B1E1);
-  static const Color ink = Color(0xFF424874);
+class AppPaletteData {
+  const AppPaletteData({
+    required this.label,
+    required this.paper,
+    required this.muted,
+    required this.accent,
+    required this.ink,
+  });
 
-  static const List<AppPaletteSwatch> swatches = [
-    AppPaletteSwatch(label: 'Paper', hexLabel: '#F4EEFF', color: paper),
-    AppPaletteSwatch(label: 'Mist', hexLabel: '#DCD6F7', color: mist),
-    AppPaletteSwatch(label: 'Sky', hexLabel: '#A6B1E1', color: sky),
-    AppPaletteSwatch(label: 'Ink', hexLabel: '#424874', color: ink),
+  final String label;
+  final Color paper;
+  final Color muted;
+  final Color accent;
+  final Color ink;
+
+  List<AppPaletteSwatch> get swatches => [
+    AppPaletteSwatch(label: 'Paper', hexLabel: _hex(paper), color: paper),
+    AppPaletteSwatch(label: 'Muted', hexLabel: _hex(muted), color: muted),
+    AppPaletteSwatch(label: 'Accent', hexLabel: _hex(accent), color: accent),
+    AppPaletteSwatch(label: 'Ink', hexLabel: _hex(ink), color: ink),
   ];
+
+  String _hex(Color color) =>
+      '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+}
+
+enum AppPalettePreset { sunset, lavender }
+
+extension AppPalettePresetX on AppPalettePreset {
+  AppPaletteData get palette {
+    return switch (this) {
+      AppPalettePreset.sunset => const AppPaletteData(
+        label: 'Sunset',
+        paper: Color(0xFFEEEEEE),
+        muted: Color(0xFF686D76),
+        accent: Color(0xFFDC5F00),
+        ink: Color(0xFF373A40),
+      ),
+      AppPalettePreset.lavender => const AppPaletteData(
+        label: 'Lavender',
+        paper: Color(0xFFF4EEFF),
+        muted: Color(0xFFDCD6F7),
+        accent: Color(0xFFA6B1E1),
+        ink: Color(0xFF424874),
+      ),
+    };
+  }
+
+  String get storageName => name;
+
+  static AppPalettePreset fromStorageName(String? value) {
+    return AppPalettePreset.values
+            .where((preset) => preset.name == value)
+            .firstOrNull ??
+        AppPalettePreset.lavender;
+  }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

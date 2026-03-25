@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:clash/models/app_color_style.dart';
 import 'package:clash/models/codex_profile.dart';
 import 'package:clash/services/codex_command_service.dart';
 import 'package:clash/services/profile_store.dart';
@@ -23,6 +24,7 @@ class AppController extends ChangeNotifier {
   final Map<String, Timer> _watchDebounceTimers = {};
   bool _isBootstrappingLive = false;
   ThemeMode _themeMode = ThemeMode.dark;
+  AppPalettePreset _palettePreset = AppPalettePreset.lavender;
   bool _isLoading = true;
   bool _isBusy = false;
   String? _errorMessage;
@@ -30,6 +32,7 @@ class AppController extends ChangeNotifier {
 
   List<CodexProfile> get profiles => _profiles;
   ThemeMode get themeMode => _themeMode;
+  AppPalettePreset get palettePreset => _palettePreset;
   bool get isLoading => _isLoading;
   bool get isBusy => _isBusy;
   String? get errorMessage => _errorMessage;
@@ -55,6 +58,9 @@ class AppController extends ChangeNotifier {
       final stored = await _profileStore.load();
       _profiles = stored.profiles;
       _themeMode = _themeModeFromName(stored.themeModeName);
+      _palettePreset = AppPalettePresetX.fromStorageName(
+        stored.palettePresetName,
+      );
       _activeProfileId =
           stored.activeProfileId ?? stored.profiles.firstOrNull?.id;
       await _restartProfileWatchers();
@@ -190,6 +196,11 @@ class AppController extends ChangeNotifier {
     await _persist(statusMessage: 'Theme updated.');
   }
 
+  Future<void> setPalettePreset(AppPalettePreset palettePreset) async {
+    _palettePreset = palettePreset;
+    await _persist(statusMessage: 'Palette updated.');
+  }
+
   Future<void> refreshActiveProfile() async {
     final profile = activeProfile;
     if (profile == null) {
@@ -290,6 +301,7 @@ class AppController extends ChangeNotifier {
       activeProfileId: _activeProfileId,
       profiles: _profiles,
       themeModeName: _themeModeName(_themeMode),
+      palettePresetName: _palettePreset.storageName,
     );
     _statusMessage = statusMessage ?? _statusMessage;
     notifyListeners();
@@ -369,6 +381,7 @@ class AppController extends ChangeNotifier {
         activeProfileId: _activeProfileId,
         profiles: _profiles,
         themeModeName: _themeModeName(_themeMode),
+        palettePresetName: _palettePreset.storageName,
       );
       if (successMessage != null) {
         _statusMessage = successMessage;
@@ -462,6 +475,7 @@ class AppController extends ChangeNotifier {
           activeProfileId: _activeProfileId,
           profiles: _profiles,
           themeModeName: _themeModeName(_themeMode),
+          palettePresetName: _palettePreset.storageName,
         );
 
         if (probe.isLoggedIn) {
@@ -480,6 +494,7 @@ class AppController extends ChangeNotifier {
             activeProfileId: _activeProfileId,
             profiles: _profiles,
             themeModeName: _themeModeName(_themeMode),
+            palettePresetName: _palettePreset.storageName,
           );
           _statusMessage = '"${profile.label}" is signed in.';
           timer.cancel();

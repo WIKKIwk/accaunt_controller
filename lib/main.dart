@@ -29,8 +29,9 @@ class ClashApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final lightScheme = _buildLightColorScheme();
-        final darkScheme = _buildDarkColorScheme();
+        final palette = controller.palettePreset.palette;
+        final lightScheme = _buildLightColorScheme(palette);
+        final darkScheme = _buildDarkColorScheme(palette);
 
         return MaterialApp(
           debugShowCheckedModeBanner: false,
@@ -40,19 +41,19 @@ class ClashApp extends StatelessWidget {
           themeAnimationCurve: Curves.easeInOutCubicEmphasized,
           theme: ThemeData(
             colorScheme: lightScheme,
-            scaffoldBackgroundColor: AppPalette.paper,
-            appBarTheme: const AppBarTheme(
-              backgroundColor: AppPalette.paper,
-              foregroundColor: AppPalette.ink,
+            scaffoldBackgroundColor: palette.paper,
+            appBarTheme: AppBarTheme(
+              backgroundColor: palette.paper,
+              foregroundColor: palette.ink,
             ),
             useMaterial3: true,
           ),
           darkTheme: ThemeData(
             colorScheme: darkScheme,
-            scaffoldBackgroundColor: AppPalette.ink,
-            appBarTheme: const AppBarTheme(
-              backgroundColor: AppPalette.ink,
-              foregroundColor: AppPalette.paper,
+            scaffoldBackgroundColor: palette.ink,
+            appBarTheme: AppBarTheme(
+              backgroundColor: palette.ink,
+              foregroundColor: palette.paper,
             ),
             useMaterial3: true,
           ),
@@ -1111,10 +1112,25 @@ class _SettingsWorkspace extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'All four colors below are used together as one palette.',
+                          'Pick which full four-color palette the app should use.',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            for (final preset in AppPalettePreset.values)
+                              ChoiceChip(
+                                selected: controller.palettePreset == preset,
+                                onSelected: (_) async {
+                                  await controller.setPalettePreset(preset);
+                                },
+                                label: Text(preset.palette.label),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         Card.outlined(
@@ -1125,7 +1141,11 @@ class _SettingsWorkspace extends StatelessWidget {
                               spacing: 20,
                               runSpacing: 16,
                               children: [
-                                for (final swatch in AppPalette.swatches)
+                                for (final swatch
+                                    in controller
+                                        .palettePreset
+                                        .palette
+                                        .swatches)
                                   SizedBox(
                                     width: 120,
                                     child: Column(
@@ -1565,54 +1585,87 @@ const List<String> _monthNames = [
 
 enum BannerTone { info, error }
 
-ColorScheme _buildLightColorScheme() {
+ColorScheme _buildLightColorScheme(AppPaletteData palette) {
   final base = ColorScheme.fromSeed(
-    seedColor: AppPalette.sky,
+    seedColor: palette.accent,
     brightness: Brightness.light,
   );
 
   return base.copyWith(
-    primary: AppPalette.ink,
-    onPrimary: AppPalette.paper,
-    secondary: AppPalette.sky,
-    onSecondary: AppPalette.paper,
-    tertiary: AppPalette.mist,
-    onTertiary: AppPalette.paper,
-    surface: AppPalette.paper,
-    onSurface: AppPalette.ink,
-    onSurfaceVariant: AppPalette.ink.withValues(alpha: 0.72),
-    outline: AppPalette.sky.withValues(alpha: 0.45),
+    primary: palette.ink,
+    onPrimary: palette.paper,
+    secondary: palette.accent,
+    onSecondary: palette.paper,
+    tertiary: palette.muted,
+    onTertiary: palette.paper,
+    surface: palette.paper,
+    onSurface: palette.ink,
+    onSurfaceVariant: palette.ink.withValues(alpha: 0.72),
+    outline: palette.muted.withValues(alpha: 0.45),
     surfaceContainerLowest: const Color(0xFFFFFFFF),
-    surfaceContainerLow: const Color(0xFFF8F4FF),
-    surfaceContainer: const Color(0xFFF1EBFC),
-    surfaceContainerHigh: const Color(0xFFEAE3FA),
-    surfaceContainerHighest: const Color(0xFFE2DAF6),
-    secondaryContainer: const Color(0xFFD8D0F2),
+    surfaceContainerLow: Color.alphaBlend(
+      palette.muted.withValues(alpha: 0.08),
+      palette.paper,
+    ),
+    surfaceContainer: Color.alphaBlend(
+      palette.muted.withValues(alpha: 0.14),
+      palette.paper,
+    ),
+    surfaceContainerHigh: Color.alphaBlend(
+      palette.muted.withValues(alpha: 0.20),
+      palette.paper,
+    ),
+    surfaceContainerHighest: Color.alphaBlend(
+      palette.muted.withValues(alpha: 0.26),
+      palette.paper,
+    ),
+    secondaryContainer: Color.alphaBlend(
+      palette.accent.withValues(alpha: 0.16),
+      palette.paper,
+    ),
   );
 }
 
-ColorScheme _buildDarkColorScheme() {
+ColorScheme _buildDarkColorScheme(AppPaletteData palette) {
   final base = ColorScheme.fromSeed(
-    seedColor: AppPalette.sky,
+    seedColor: palette.accent,
     brightness: Brightness.dark,
   );
 
   return base.copyWith(
-    primary: AppPalette.mist,
-    onPrimary: AppPalette.ink,
-    secondary: AppPalette.sky,
-    onSecondary: AppPalette.ink,
-    tertiary: AppPalette.paper,
-    onTertiary: AppPalette.ink,
-    surface: AppPalette.ink,
-    onSurface: AppPalette.paper,
-    onSurfaceVariant: const Color(0xFFD8D0F2),
-    outline: AppPalette.sky.withValues(alpha: 0.6),
-    surfaceContainerLowest: const Color(0xFF32365A),
-    surfaceContainerLow: const Color(0xFF383D63),
-    surfaceContainer: const Color(0xFF3D426A),
-    surfaceContainerHigh: const Color(0xFF444872),
-    surfaceContainerHighest: const Color(0xFF4D5380),
-    secondaryContainer: const Color(0xFF596295),
+    primary: palette.paper,
+    onPrimary: palette.ink,
+    secondary: palette.accent,
+    onSecondary: palette.paper,
+    tertiary: palette.muted,
+    onTertiary: palette.paper,
+    surface: palette.ink,
+    onSurface: palette.paper,
+    onSurfaceVariant: palette.paper.withValues(alpha: 0.74),
+    outline: palette.muted.withValues(alpha: 0.6),
+    surfaceContainerLowest: Color.alphaBlend(
+      Colors.black.withValues(alpha: 0.18),
+      palette.ink,
+    ),
+    surfaceContainerLow: Color.alphaBlend(
+      palette.muted.withValues(alpha: 0.10),
+      palette.ink,
+    ),
+    surfaceContainer: Color.alphaBlend(
+      palette.muted.withValues(alpha: 0.16),
+      palette.ink,
+    ),
+    surfaceContainerHigh: Color.alphaBlend(
+      palette.muted.withValues(alpha: 0.22),
+      palette.ink,
+    ),
+    surfaceContainerHighest: Color.alphaBlend(
+      palette.muted.withValues(alpha: 0.28),
+      palette.ink,
+    ),
+    secondaryContainer: Color.alphaBlend(
+      palette.accent.withValues(alpha: 0.18),
+      palette.ink,
+    ),
   );
 }
