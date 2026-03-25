@@ -38,7 +38,7 @@ class AppPaletteData {
       '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 }
 
-enum AppPalettePreset { sunset, lavender }
+enum AppPalettePreset { sunset, lavender, sage }
 
 extension AppPalettePresetX on AppPalettePreset {
   AppPaletteData get palette {
@@ -56,6 +56,13 @@ extension AppPalettePresetX on AppPalettePreset {
         muted: Color(0xFFDCD6F7),
         accent: Color(0xFFA6B1E1),
         ink: Color(0xFF424874),
+      ),
+      AppPalettePreset.sage => const AppPaletteData(
+        label: 'Sage',
+        paper: Color(0xFFE1F0DA),
+        muted: Color(0xFFD4E7C5),
+        accent: Color(0xFFBFD8AF),
+        ink: Color(0xFF99BC85),
       ),
     };
   }
