@@ -37,7 +37,7 @@ class ClashApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Codex Clash',
-      themeMode: ThemeMode.dark,
+      themeMode: controller.themeMode,
       theme: ThemeData(colorScheme: lightScheme, useMaterial3: true),
       darkTheme: ThemeData(colorScheme: darkScheme, useMaterial3: true),
       home: ClashHomePage(controller: controller),
@@ -45,7 +45,7 @@ class ClashApp extends StatelessWidget {
   }
 }
 
-enum AppSection { home, accounts }
+enum AppSection { home, accounts, settings }
 
 class ClashHomePage extends StatefulWidget {
   const ClashHomePage({super.key, required this.controller});
@@ -117,6 +117,10 @@ class _ClashHomePageState extends State<ClashHomePage> {
                                   context,
                                   widget.controller,
                                 ),
+                              ),
+                              AppSection.settings => _SettingsWorkspace(
+                                key: const ValueKey('settings'),
+                                controller: widget.controller,
                               ),
                             },
                           ),
@@ -212,6 +216,11 @@ class _NavigationPanel extends StatelessWidget {
                     icon: Icon(Icons.manage_accounts_outlined),
                     selectedIcon: Icon(Icons.manage_accounts_rounded),
                     label: Text('Accounts'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings_rounded),
+                    label: Text('Settings'),
                   ),
                 ],
               ),
@@ -902,6 +911,105 @@ class _MetricChip extends StatelessWidget {
       label: Text(label),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+}
+
+class _SettingsWorkspace extends StatelessWidget {
+  const _SettingsWorkspace({super.key, required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: Card(
+          elevation: 0,
+          color: scheme.surfaceContainerLow,
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Settings', style: theme.textTheme.headlineMedium),
+                const SizedBox(height: 8),
+                Text(
+                  'Adjust app appearance and other preferences.',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Card.outlined(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Appearance', style: theme.textTheme.titleLarge),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Choose how Codex Clash should look.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SegmentedButton<ThemeMode>(
+                          segments: const [
+                            ButtonSegment<ThemeMode>(
+                              value: ThemeMode.light,
+                              icon: Icon(Icons.light_mode_outlined),
+                              label: Text('Light'),
+                            ),
+                            ButtonSegment<ThemeMode>(
+                              value: ThemeMode.dark,
+                              icon: Icon(Icons.dark_mode_outlined),
+                              label: Text('Dark'),
+                            ),
+                            ButtonSegment<ThemeMode>(
+                              value: ThemeMode.system,
+                              icon: Icon(Icons.brightness_auto_outlined),
+                              label: Text('System'),
+                            ),
+                          ],
+                          selected: {controller.themeMode},
+                          onSelectionChanged: (selection) async {
+                            final selectedMode = selection.first;
+                            await controller.setThemeMode(selectedMode);
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(switch (controller.themeMode) {
+                            ThemeMode.light => Icons.light_mode,
+                            ThemeMode.dark => Icons.dark_mode,
+                            ThemeMode.system => Icons.brightness_auto,
+                          }),
+                          title: const Text('Current theme'),
+                          subtitle: Text(switch (controller.themeMode) {
+                            ThemeMode.light => 'Light',
+                            ThemeMode.dark => 'Dark',
+                            ThemeMode.system => 'Follow system',
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

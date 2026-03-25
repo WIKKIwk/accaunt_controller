@@ -6,22 +6,35 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 class StoredProfiles {
-  const StoredProfiles({required this.activeProfileId, required this.profiles});
+  const StoredProfiles({
+    required this.activeProfileId,
+    required this.profiles,
+    required this.themeModeName,
+  });
 
   final String? activeProfileId;
   final List<CodexProfile> profiles;
+  final String themeModeName;
 }
 
 class ProfileStore {
   Future<StoredProfiles> load() async {
     final file = await _profilesFile();
     if (!await file.exists()) {
-      return const StoredProfiles(activeProfileId: null, profiles: []);
+      return const StoredProfiles(
+        activeProfileId: null,
+        profiles: [],
+        themeModeName: 'dark',
+      );
     }
 
     final raw = await file.readAsString();
     if (raw.trim().isEmpty) {
-      return const StoredProfiles(activeProfileId: null, profiles: []);
+      return const StoredProfiles(
+        activeProfileId: null,
+        profiles: [],
+        themeModeName: 'dark',
+      );
     }
 
     final json = jsonDecode(raw) as Map<String, dynamic>;
@@ -33,18 +46,21 @@ class ProfileStore {
     return StoredProfiles(
       activeProfileId: json['activeProfileId'] as String?,
       profiles: profileItems,
+      themeModeName: (json['themeMode'] as String?) ?? 'dark',
     );
   }
 
   Future<void> save({
     required String? activeProfileId,
     required List<CodexProfile> profiles,
+    required String themeModeName,
   }) async {
     final file = await _profilesFile();
     await file.parent.create(recursive: true);
 
     final payload = {
       'activeProfileId': activeProfileId,
+      'themeMode': themeModeName,
       'profiles': profiles.map((profile) => profile.toJson()).toList(),
     };
 

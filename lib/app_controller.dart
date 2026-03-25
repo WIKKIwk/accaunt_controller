@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:clash/models/codex_profile.dart';
 import 'package:clash/services/codex_command_service.dart';
 import 'package:clash/services/profile_store.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 class AppController extends ChangeNotifier {
   AppController({
@@ -18,12 +18,14 @@ class AppController extends ChangeNotifier {
   List<CodexProfile> _profiles = const [];
   String? _activeProfileId;
   Timer? _loginWatchTimer;
+  ThemeMode _themeMode = ThemeMode.dark;
   bool _isLoading = true;
   bool _isBusy = false;
   String? _errorMessage;
   String? _statusMessage;
 
   List<CodexProfile> get profiles => _profiles;
+  ThemeMode get themeMode => _themeMode;
   bool get isLoading => _isLoading;
   bool get isBusy => _isBusy;
   String? get errorMessage => _errorMessage;
@@ -48,6 +50,7 @@ class AppController extends ChangeNotifier {
     try {
       final stored = await _profileStore.load();
       _profiles = stored.profiles;
+      _themeMode = _themeModeFromName(stored.themeModeName);
       _activeProfileId =
           stored.activeProfileId ?? stored.profiles.firstOrNull?.id;
       final initialProfile = activeProfile;
@@ -175,6 +178,11 @@ class AppController extends ChangeNotifier {
     unawaited(_refreshProfileSilently(profileId));
   }
 
+  Future<void> setThemeMode(ThemeMode themeMode) async {
+    _themeMode = themeMode;
+    await _persist(statusMessage: 'Theme updated.');
+  }
+
   Future<void> refreshActiveProfile() async {
     final profile = activeProfile;
     if (profile == null) {
@@ -283,6 +291,7 @@ class AppController extends ChangeNotifier {
     await _profileStore.save(
       activeProfileId: _activeProfileId,
       profiles: _profiles,
+      themeModeName: _themeModeName(_themeMode),
     );
     _statusMessage = statusMessage ?? _statusMessage;
     notifyListeners();
@@ -328,6 +337,7 @@ class AppController extends ChangeNotifier {
       await _profileStore.save(
         activeProfileId: _activeProfileId,
         profiles: _profiles,
+        themeModeName: _themeModeName(_themeMode),
       );
       if (successMessage != null) {
         _statusMessage = successMessage;
@@ -363,6 +373,7 @@ class AppController extends ChangeNotifier {
         await _profileStore.save(
           activeProfileId: _activeProfileId,
           profiles: _profiles,
+          themeModeName: _themeModeName(_themeMode),
         );
 
         if (probe.isLoggedIn) {
@@ -380,6 +391,7 @@ class AppController extends ChangeNotifier {
           await _profileStore.save(
             activeProfileId: _activeProfileId,
             profiles: _profiles,
+            themeModeName: _themeModeName(_themeMode),
           );
           _statusMessage = '"${profile.label}" is signed in.';
           timer.cancel();
@@ -410,6 +422,23 @@ class AppController extends ChangeNotifier {
   void dispose() {
     _loginWatchTimer?.cancel();
     super.dispose();
+  }
+
+  ThemeMode _themeModeFromName(String name) {
+    return switch (name) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      'system' => ThemeMode.system,
+      _ => ThemeMode.dark,
+    };
+  }
+
+  String _themeModeName(ThemeMode mode) {
+    return switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark => 'dark',
+      ThemeMode.system => 'system',
+    };
   }
 }
 
