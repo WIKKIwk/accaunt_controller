@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:clash/models/codex_profile.dart';
 import 'package:clash/services/codex_command_service.dart';
@@ -18,6 +19,8 @@ class AppController extends ChangeNotifier {
   List<CodexProfile> _profiles = const [];
   String? _activeProfileId;
   Timer? _loginWatchTimer;
+  final Map<String, StreamSubscription<FileSystemEvent>> _profileWatchers = {};
+  final Map<String, Timer> _watchDebounceTimers = {};
   ThemeMode _themeMode = ThemeMode.dark;
   bool _isLoading = true;
   bool _isBusy = false;
@@ -53,6 +56,7 @@ class AppController extends ChangeNotifier {
       _themeMode = _themeModeFromName(stored.themeModeName);
       _activeProfileId =
           stored.activeProfileId ?? stored.profiles.firstOrNull?.id;
+      await _restartProfileWatchers();
       final initialProfile = activeProfile;
       if (initialProfile != null) {
         unawaited(_refreshProfileSilently(initialProfile.id));
@@ -90,6 +94,7 @@ class AppController extends ChangeNotifier {
     _profiles = [..._profiles, profile];
     _activeProfileId = profile.id;
     await _persist(statusMessage: 'Created profile "${profile.label}".');
+    await _restartProfileWatchers();
   }
 
   Future<void> renameProfile({
@@ -313,6 +318,39 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> _restartProfileWatchers() async {
+    for (final subscription in _profileWatchers.values) {
+      await subscription.cancel();
+    }
+    _profileWatchers.clear();
+
+    for (final timer in _watchDebounceTimers.values) {
+      timer.cancel();
+    }
+    _watchDebounceTimers.clear();
+
+    for (final profile in _profiles) {
+      final directory = Directory(profile.codexHome);
+      await directory.create(recursive: true);
+      _profileWatchers[profile.id] = directory.watch(recursive: true).listen((
+        event,
+      ) {
+        final path = event.path;
+        if (!path.endsWith('.jsonl') && !path.endsWith('auth.json')) {
+          return;
+        }
+
+        _watchDebounceTimers[profile.id]?.cancel();
+        _watchDebounceTimers[profile.id] = Timer(
+          const Duration(milliseconds: 900),
+          () {
+            unawaited(_refreshProfileSilently(profile.id));
+          },
+        );
+      });
+    }
+  }
+
   Future<void> _refreshProfileSilently(
     String profileId, {
     String? successMessage,
@@ -421,6 +459,12 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _loginWatchTimer?.cancel();
+    for (final timer in _watchDebounceTimers.values) {
+      timer.cancel();
+    }
+    for (final subscription in _profileWatchers.values) {
+      subscription.cancel();
+    }
     super.dispose();
   }
 
