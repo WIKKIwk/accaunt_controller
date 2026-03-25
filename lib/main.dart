@@ -25,22 +25,27 @@ class ClashApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lightScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF4D7C99),
-      brightness: Brightness.light,
-    );
-    final darkScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF84C7F2),
-      brightness: Brightness.dark,
-    );
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final lightScheme = ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4D7C99),
+          brightness: Brightness.light,
+        );
+        final darkScheme = ColorScheme.fromSeed(
+          seedColor: const Color(0xFF84C7F2),
+          brightness: Brightness.dark,
+        );
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Codex Clash',
-      themeMode: controller.themeMode,
-      theme: ThemeData(colorScheme: lightScheme, useMaterial3: true),
-      darkTheme: ThemeData(colorScheme: darkScheme, useMaterial3: true),
-      home: ClashHomePage(controller: controller),
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Codex Clash',
+          themeMode: controller.themeMode,
+          theme: ThemeData(colorScheme: lightScheme, useMaterial3: true),
+          darkTheme: ThemeData(colorScheme: darkScheme, useMaterial3: true),
+          home: ClashHomePage(controller: controller),
+        );
+      },
     );
   }
 }
