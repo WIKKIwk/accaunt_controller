@@ -47,12 +47,12 @@ class ClashApp extends StatelessWidget {
               foregroundColor: lightScheme.onSurface,
             ),
             cardTheme: CardThemeData(
-              color: lightScheme.surfaceContainerHigh,
+              color: lightScheme.surfaceContainerHighest,
               surfaceTintColor: Colors.transparent,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
                 side: BorderSide(
-                  color: lightScheme.outline.withValues(alpha: 0.18),
+                  color: lightScheme.outline.withValues(alpha: 0.28),
                 ),
               ),
             ),
@@ -1626,13 +1626,13 @@ ColorScheme _buildLightColorScheme(AppPaletteData palette) {
     surface: surface,
     onSurface: onSurface,
     onSurfaceVariant: onSurface.withValues(alpha: 0.74),
-    outline: secondary.withValues(alpha: 0.28),
+    outline: _mix(onSurface, palette.muted, 0.22),
     surfaceContainerLowest: const Color(0xFFFFFFFF),
-    surfaceContainerLow: _mix(surface, palette.ink, 0.03),
-    surfaceContainer: _mix(surface, palette.muted, 0.10),
-    surfaceContainerHigh: _mix(surface, palette.ink, 0.08),
-    surfaceContainerHighest: _mix(surface, palette.ink, 0.12),
-    secondaryContainer: _mix(surface, palette.accent, 0.24),
+    surfaceContainerLow: _mix(surface, palette.ink, 0.05),
+    surfaceContainer: _mix(surface, palette.ink, 0.08),
+    surfaceContainerHigh: _mix(surface, palette.ink, 0.11),
+    surfaceContainerHighest: _mix(surface, palette.ink, 0.15),
+    secondaryContainer: _mix(surface, palette.accent, 0.30),
   );
 }
 
