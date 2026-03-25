@@ -1606,15 +1606,35 @@ const List<String> _monthNames = [
 enum BannerTone { info, error }
 
 ColorScheme _buildLightColorScheme(AppPaletteData palette) {
+  final colors = _paletteColors(palette);
+  final lightest = _lightestColor(colors);
+  final darkest = _darkestColor(colors);
+  final saturated = _sortedBySaturation(colors);
+  final primaryBase = saturated.first;
+  final secondaryBase = saturated.length > 1 ? saturated[1] : darkest;
+  final tertiaryBase = saturated.length > 2 ? saturated[2] : lightest;
+
   final base = ColorScheme.fromSeed(
-    seedColor: _tone(palette.accent, 0.52),
+    seedColor: _tone(primaryBase, 0.52),
     brightness: Brightness.light,
   );
-  final surface = _tone(palette.paper, 0.992, saturation: 0.14);
-  final onSurface = _tone(palette.ink, 0.18, saturation: 0.28);
-  final primary = _tone(palette.ink, 0.34, saturation: 0.34);
-  final secondary = _tone(palette.accent, 0.58, saturation: 0.30);
-  final tertiary = _tone(palette.muted, 0.52, saturation: 0.22);
+  final surface = _tone(lightest, 0.988, saturation: 0.10);
+  final onSurface = _tone(darkest, 0.18, saturation: 0.22);
+  final primary = _tone(
+    primaryBase,
+    HSLColor.fromColor(primaryBase).lightness < 0.45 ? 0.42 : 0.56,
+    saturation: 0.38,
+  );
+  final secondary = _tone(
+    secondaryBase,
+    HSLColor.fromColor(secondaryBase).lightness < 0.45 ? 0.48 : 0.62,
+    saturation: 0.28,
+  );
+  final tertiary = _tone(
+    tertiaryBase,
+    HSLColor.fromColor(tertiaryBase).lightness < 0.45 ? 0.54 : 0.70,
+    saturation: 0.22,
+  );
 
   return base.copyWith(
     primary: primary,
@@ -1626,45 +1646,85 @@ ColorScheme _buildLightColorScheme(AppPaletteData palette) {
     surface: surface,
     onSurface: onSurface,
     onSurfaceVariant: onSurface.withValues(alpha: 0.74),
-    outline: _mix(onSurface, palette.muted, 0.22),
+    outline: _mix(onSurface, secondaryBase, 0.22),
     surfaceContainerLowest: const Color(0xFFFFFFFF),
-    surfaceContainerLow: _mix(surface, palette.ink, 0.05),
-    surfaceContainer: _mix(surface, palette.ink, 0.08),
-    surfaceContainerHigh: _mix(surface, palette.ink, 0.11),
-    surfaceContainerHighest: _mix(surface, palette.ink, 0.15),
-    secondaryContainer: _mix(surface, palette.accent, 0.30),
+    surfaceContainerLow: _mix(surface, darkest, 0.05),
+    surfaceContainer: _mix(surface, darkest, 0.08),
+    surfaceContainerHigh: _mix(surface, darkest, 0.11),
+    surfaceContainerHighest: _mix(surface, darkest, 0.15),
+    secondaryContainer: _mix(surface, primaryBase, 0.30),
   );
 }
 
 ColorScheme _buildDarkColorScheme(AppPaletteData palette) {
+  final colors = _paletteColors(palette);
+  final lightest = _lightestColor(colors);
+  final darkest = _darkestColor(colors);
+  final saturated = _sortedBySaturation(colors);
+  final primaryBase = saturated.first;
+  final secondaryBase = saturated.length > 1 ? saturated[1] : lightest;
+  final tertiaryBase = saturated.length > 2 ? saturated[2] : lightest;
+
   final base = ColorScheme.fromSeed(
-    seedColor: _tone(palette.accent, 0.58),
+    seedColor: _tone(primaryBase, 0.58),
     brightness: Brightness.dark,
   );
-  final surface = _tone(palette.ink, 0.14, saturation: 0.18);
-  final onSurface = _tone(palette.paper, 0.94, saturation: 0.18);
-  final primary = _tone(palette.accent, 0.78, saturation: 0.26);
-  final secondary = _tone(palette.muted, 0.72, saturation: 0.20);
-  final tertiary = _tone(palette.paper, 0.84, saturation: 0.18);
+  final surface = _tone(darkest, 0.14, saturation: 0.18);
+  final onSurface = _tone(lightest, 0.94, saturation: 0.16);
+  final primary = _tone(primaryBase, 0.78, saturation: 0.24);
+  final secondary = _tone(secondaryBase, 0.72, saturation: 0.20);
+  final tertiary = _tone(tertiaryBase, 0.82, saturation: 0.16);
 
   return base.copyWith(
     primary: primary,
-    onPrimary: _tone(palette.ink, 0.18, saturation: 0.16),
+    onPrimary: _tone(darkest, 0.18, saturation: 0.16),
     secondary: secondary,
-    onSecondary: _tone(palette.ink, 0.18, saturation: 0.16),
+    onSecondary: _tone(darkest, 0.18, saturation: 0.16),
     tertiary: tertiary,
-    onTertiary: _tone(palette.ink, 0.18, saturation: 0.16),
+    onTertiary: _tone(darkest, 0.18, saturation: 0.16),
     surface: surface,
     onSurface: onSurface,
     onSurfaceVariant: onSurface.withValues(alpha: 0.76),
     outline: secondary.withValues(alpha: 0.34),
     surfaceContainerLowest: _mix(surface, Colors.black, 0.12),
-    surfaceContainerLow: _mix(surface, palette.muted, 0.08),
-    surfaceContainer: _mix(surface, palette.muted, 0.12),
-    surfaceContainerHigh: _mix(surface, palette.muted, 0.16),
-    surfaceContainerHighest: _mix(surface, palette.muted, 0.20),
-    secondaryContainer: _mix(surface, palette.accent, 0.14),
+    surfaceContainerLow: _mix(surface, lightest, 0.08),
+    surfaceContainer: _mix(surface, lightest, 0.12),
+    surfaceContainerHigh: _mix(surface, lightest, 0.16),
+    surfaceContainerHighest: _mix(surface, lightest, 0.20),
+    secondaryContainer: _mix(surface, primaryBase, 0.16),
   );
+}
+
+List<Color> _paletteColors(AppPaletteData palette) {
+  return [palette.paper, palette.muted, palette.accent, palette.ink];
+}
+
+Color _lightestColor(List<Color> colors) {
+  return colors.reduce((left, right) {
+    return HSLColor.fromColor(left).lightness >=
+            HSLColor.fromColor(right).lightness
+        ? left
+        : right;
+  });
+}
+
+Color _darkestColor(List<Color> colors) {
+  return colors.reduce((left, right) {
+    return HSLColor.fromColor(left).lightness <=
+            HSLColor.fromColor(right).lightness
+        ? left
+        : right;
+  });
+}
+
+List<Color> _sortedBySaturation(List<Color> colors) {
+  final sorted = [...colors];
+  sorted.sort((left, right) {
+    final ls = HSLColor.fromColor(left).saturation;
+    final rs = HSLColor.fromColor(right).saturation;
+    return rs.compareTo(ls);
+  });
+  return sorted;
 }
 
 Color _tone(Color color, double lightness, {double? saturation}) {
