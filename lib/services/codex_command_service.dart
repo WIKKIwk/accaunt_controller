@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:clash/models/codex_probe.dart';
 import 'package:clash/models/codex_profile.dart';
 import 'package:clash/models/codex_usage_snapshot.dart';
 
 class CodexCommandService {
+  final Map<String, _UsageSnapshotCacheEntry> _usageSnapshotCache = {};
+
   Future<CodexProbe> probeLogin(
     CodexProfile profile, {
     bool refreshUsage = false,
@@ -26,7 +29,7 @@ class CodexCommandService {
     }
 
     final usageSnapshot = isLoggedIn
-        ? await _readLatestUsageSnapshot(profile)
+        ? await readLatestUsageSnapshot(profile, forceRescan: refreshUsage)
         : null;
 
     return CodexProbe(
@@ -35,6 +38,47 @@ class CodexCommandService {
       isLoggedIn: isLoggedIn,
       usageSnapshot: usageSnapshot,
     );
+  }
+
+  Future<CodexUsageSnapshot?> readLatestUsageSnapshot(
+    CodexProfile profile, {
+    bool forceRescan = false,
+  }) async {
+    final cacheKey = profile.codexHome;
+    final cached = _usageSnapshotCache[cacheKey];
+
+    if (!forceRescan && cached != null) {
+      final cachedFile = File(cached.filePath);
+      if (await cachedFile.exists()) {
+        final modifiedAt = await cachedFile.lastModified();
+        if (modifiedAt == cached.modifiedAt) {
+          return cached.snapshot;
+        }
+
+        final refreshedSnapshot = await _parseUsageSnapshot(cachedFile);
+        if (refreshedSnapshot != null) {
+          _usageSnapshotCache[cacheKey] = _UsageSnapshotCacheEntry(
+            filePath: cached.filePath,
+            modifiedAt: modifiedAt,
+            snapshot: refreshedSnapshot,
+          );
+          return refreshedSnapshot;
+        }
+      }
+    }
+
+    final latest = await _findLatestUsageSnapshot(profile);
+    if (latest == null) {
+      _usageSnapshotCache.remove(cacheKey);
+      return null;
+    }
+
+    _usageSnapshotCache[cacheKey] = _UsageSnapshotCacheEntry(
+      filePath: latest.file.path,
+      modifiedAt: latest.modifiedAt,
+      snapshot: latest.snapshot,
+    );
+    return latest.snapshot;
   }
 
   Future<void> launchCodex(CodexProfile profile) async {
@@ -54,18 +98,26 @@ class CodexCommandService {
   }
 
   Future<void> openUsagePage() async {
-    final result = await Process.run('xdg-open', [
-      'https://chatgpt.com/codex/settings/usage',
-    ]);
+    final command = _openCommand();
+    final result = await Process.run(command.$1, command.$2);
 
     if (result.exitCode != 0) {
       throw ProcessException(
-        'xdg-open',
-        const ['https://chatgpt.com/codex/settings/usage'],
+        command.$1,
+        command.$2,
         '${result.stdout}${result.stderr}',
         result.exitCode,
       );
     }
+  }
+
+  Future<void> makeProfileDefault(
+    CodexProfile profile, {
+    String? homeRoot,
+  }) async {
+    final normalizedSourceHome = _normalizePath(profile.codexHome);
+    final defaultHome = defaultCodexHome(homeRoot: homeRoot);
+    await syncCodexHome(sourceHome: normalizedSourceHome, targetHome: defaultHome);
   }
 
   String buildManualStatusCommand(CodexProfile profile) {
@@ -95,6 +147,15 @@ class CodexCommandService {
     required String innerCommand,
   }) async {
     await Directory(profile.codexHome).create(recursive: true);
+
+    if (Platform.isMacOS) {
+      await _launchInMacOSTerminal(
+        profile: profile,
+        title: title,
+        innerCommand: innerCommand,
+      );
+      return;
+    }
 
     final terminal = await _pickTerminal();
     final escapedTitle = _shellEscape(title);
@@ -139,6 +200,43 @@ class CodexCommandService {
     }
   }
 
+  Future<void> _launchInMacOSTerminal({
+    required CodexProfile profile,
+    required String title,
+    required String innerCommand,
+  }) async {
+    final scriptFile = File(
+      '${Directory.systemTemp.path}/codex-clash-${DateTime.now().microsecondsSinceEpoch}.command',
+    );
+    final escapedPath = _shellEscape(profile.codexHome);
+    final script = [
+      '#!/bin/bash',
+      'export CODEX_HOME=$escapedPath',
+      'printf "\\\\033]0;$title\\\\007"',
+      innerCommand,
+      'printf "\\nPress Enter to close..."',
+      'read -r _',
+    ].join('\n');
+
+    await scriptFile.writeAsString(script);
+    await Process.run('chmod', ['700', scriptFile.path]);
+
+    final result = await Process.run('open', [
+      '-a',
+      'Terminal',
+      scriptFile.path,
+    ]);
+
+    if (result.exitCode != 0) {
+      throw ProcessException(
+        'open',
+        ['-a', 'Terminal', scriptFile.path],
+        '${result.stdout}${result.stderr}',
+        result.exitCode,
+      );
+    }
+  }
+
   Future<_TerminalCommand> _pickTerminal() async {
     const candidates = <_TerminalCommand>[
       _TerminalCommand('x-terminal-emulator'),
@@ -174,6 +272,119 @@ class CodexCommandService {
     return "'${value.replaceAll("'", "'\"'\"'")}'";
   }
 
+  String defaultCodexHome({String? homeRoot}) {
+    final resolvedHome = homeRoot ?? Platform.environment['HOME'] ?? '.';
+    return _normalizePath('$resolvedHome/.codex');
+  }
+
+  String _normalizePath(String value) => File(value).absolute.path;
+
+  Future<void> syncCodexHome({
+    required String sourceHome,
+    required String targetHome,
+  }) async {
+    final normalizedSourceHome = _normalizePath(sourceHome);
+    final normalizedTargetHome = _normalizePath(targetHome);
+    if (normalizedSourceHome == normalizedTargetHome) {
+      return;
+    }
+
+    final sourceDir = Directory(normalizedSourceHome);
+    if (!await sourceDir.exists()) {
+      throw FileSystemException(
+        'Codex home does not exist.',
+        normalizedSourceHome,
+      );
+    }
+
+    final sourceAuthFile = File('$normalizedSourceHome/auth.json');
+    if (!await sourceAuthFile.exists()) {
+      throw const FileSystemException(
+        'This profile does not have a local Codex login yet.',
+        'auth.json',
+      );
+    }
+
+    final targetDir = Directory(normalizedTargetHome);
+    await targetDir.create(recursive: true);
+
+    await _copyFileIfPresent(
+      sourcePath: '$normalizedSourceHome/auth.json',
+      targetPath: '$normalizedTargetHome/auth.json',
+    );
+    await _copyFileIfPresent(
+      sourcePath: '$normalizedSourceHome/session_index.jsonl',
+      targetPath: '$normalizedTargetHome/session_index.jsonl',
+      deleteTargetIfMissing: true,
+    );
+    await _copyDirectoryIfPresent(
+      sourcePath: '$normalizedSourceHome/sessions',
+      targetPath: '$normalizedTargetHome/sessions',
+      replaceTarget: true,
+    );
+  }
+
+  Future<void> _copyFileIfPresent({
+    required String sourcePath,
+    required String targetPath,
+    bool deleteTargetIfMissing = false,
+  }) async {
+    final sourceFile = File(sourcePath);
+    final targetFile = File(targetPath);
+    if (!await sourceFile.exists()) {
+      if (deleteTargetIfMissing && await targetFile.exists()) {
+        await targetFile.delete();
+      }
+      return;
+    }
+
+    await targetFile.parent.create(recursive: true);
+    if (await targetFile.exists()) {
+      await targetFile.delete();
+    }
+    await sourceFile.copy(targetFile.path);
+  }
+
+  Future<void> _copyDirectoryIfPresent({
+    required String sourcePath,
+    required String targetPath,
+    bool replaceTarget = false,
+  }) async {
+    final sourceDir = Directory(sourcePath);
+    final targetDir = Directory(targetPath);
+    if (!await sourceDir.exists()) {
+      if (replaceTarget && await targetDir.exists()) {
+        await targetDir.delete(recursive: true);
+      }
+      return;
+    }
+
+    if (replaceTarget && await targetDir.exists()) {
+      await targetDir.delete(recursive: true);
+    }
+    await targetDir.create(recursive: true);
+
+    await for (final entity in sourceDir.list(recursive: true, followLinks: false)) {
+      final relativePath = entity.path.substring(sourcePath.length + 1);
+      final destinationPath = '$targetPath/$relativePath';
+      if (entity is Directory) {
+        await Directory(destinationPath).create(recursive: true);
+      } else if (entity is File) {
+        final outputFile = File(destinationPath);
+        await outputFile.parent.create(recursive: true);
+        await entity.copy(outputFile.path);
+      }
+    }
+  }
+
+  (String, List<String>) _openCommand() {
+    const usageUrl = 'https://chatgpt.com/codex/settings/usage';
+    if (Platform.isMacOS) {
+      return ('open', [usageUrl]);
+    }
+    return ('xdg-open', [usageUrl]);
+  }
+
   bool _isLoggedInSummary(String summary) {
     final normalized = summary.trim().toLowerCase();
     if (normalized.startsWith('logged in')) {
@@ -197,7 +408,7 @@ class CodexCommandService {
     ], environment: _environmentFor(profile));
   }
 
-  Future<CodexUsageSnapshot?> _readLatestUsageSnapshot(
+  Future<_UsageSnapshotResult?> _findLatestUsageSnapshot(
     CodexProfile profile,
   ) async {
     final sessionsDir = Directory('${profile.codexHome}/sessions');
@@ -229,7 +440,11 @@ class CodexCommandService {
     for (final file in files) {
       final snapshot = await _parseUsageSnapshot(file);
       if (snapshot != null) {
-        return snapshot;
+        return _UsageSnapshotResult(
+          file: file,
+          modifiedAt: file.statSync().modified,
+          snapshot: snapshot,
+        );
       }
     }
 
@@ -237,9 +452,9 @@ class CodexCommandService {
   }
 
   Future<CodexUsageSnapshot?> _parseUsageSnapshot(File file) async {
-    final lines = await file.readAsLines();
+    final lines = await _readRecentLines(file);
 
-    for (final line in lines.reversed) {
+    for (final line in lines) {
       if (line.trim().isEmpty) {
         continue;
       }
@@ -303,6 +518,40 @@ class CodexCommandService {
     return null;
   }
 
+  Future<List<String>> _readRecentLines(File file) async {
+    const initialChunkSize = 64 * 1024;
+    final recentChunk = await _readTailChunk(file, initialChunkSize);
+    final recentLines = LineSplitter.split(recentChunk).toList().reversed;
+    if (recentLines.isNotEmpty) {
+      return recentLines.toList();
+    }
+
+    return (await file.readAsLines()).reversed.toList();
+  }
+
+  Future<String> _readTailChunk(File file, int maxBytes) async {
+    final randomAccessFile = await file.open();
+    try {
+      final length = await randomAccessFile.length();
+      final start = math.max(0, length - maxBytes);
+      await randomAccessFile.setPosition(start);
+      final bytes = await randomAccessFile.read(length - start);
+      var content = utf8.decode(bytes, allowMalformed: true);
+
+      if (start > 0) {
+        final firstBreak = content.indexOf('\n');
+        if (firstBreak == -1) {
+          return '';
+        }
+        content = content.substring(firstBreak + 1);
+      }
+
+      return content;
+    } finally {
+      await randomAccessFile.close();
+    }
+  }
+
   CodexUsageWindow _parseWindow(Map<String, dynamic> windowJson) {
     final minutes = (windowJson['window_minutes'] as num?)?.toInt() ?? 0;
     final usedPercent = (windowJson['used_percent'] as num?)?.toDouble() ?? 0;
@@ -337,4 +586,28 @@ class _TerminalCommand {
   const _TerminalCommand(this.binary);
 
   final String binary;
+}
+
+class _UsageSnapshotResult {
+  const _UsageSnapshotResult({
+    required this.file,
+    required this.modifiedAt,
+    required this.snapshot,
+  });
+
+  final File file;
+  final DateTime modifiedAt;
+  final CodexUsageSnapshot snapshot;
+}
+
+class _UsageSnapshotCacheEntry {
+  const _UsageSnapshotCacheEntry({
+    required this.filePath,
+    required this.modifiedAt,
+    required this.snapshot,
+  });
+
+  final String filePath;
+  final DateTime modifiedAt;
+  final CodexUsageSnapshot snapshot;
 }

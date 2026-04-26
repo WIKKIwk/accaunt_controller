@@ -1,7 +1,13 @@
 FLUTTER ?= flutter
-DEVICE ?= linux
+UNAME_S := $(shell uname -s)
 
-.PHONY: run pub-get analyze test build-linux clean
+ifeq ($(UNAME_S),Darwin)
+DEVICE ?= macos
+else
+DEVICE ?= linux
+endif
+
+.PHONY: run pub-get analyze test build-linux build-macos clean
 
 run:
 	$(FLUTTER) run -d $(DEVICE)
@@ -17,6 +23,9 @@ test:
 
 build-linux:
 	$(FLUTTER) build linux
+
+build-macos:
+	$(FLUTTER) build macos
 
 clean:
 	$(FLUTTER) clean

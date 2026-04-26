@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'package:clash/app_controller.dart';
 import 'package:clash/models/app_color_style.dart';
 import 'package:clash/models/codex_probe.dart';
 import 'package:clash/models/codex_profile.dart';
 import 'package:clash/models/codex_usage_snapshot.dart';
 import 'package:clash/services/codex_command_service.dart';
+import 'package:clash/services/official_usage_parser.dart';
 import 'package:clash/services/profile_store.dart';
 import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -662,15 +666,6 @@ class _AccountsWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (controller.profiles.isEmpty || controller.activeProfile == null) {
-      return _EmptyModuleState(
-        icon: Icons.manage_accounts_outlined,
-        title: 'No selected account',
-        description:
-            'Select an account from the left sidebar to manage login and refresh its limits.',
-      );
-    }
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -682,7 +677,19 @@ class _AccountsWorkspace extends StatelessWidget {
           ),
         ),
         const VerticalDivider(width: 1, thickness: 1),
-        Expanded(child: _AccountDetailCard(controller: controller)),
+        Expanded(
+          child: controller.activeProfile == null
+              ? _EmptyModuleState(
+                  icon: Icons.manage_accounts_outlined,
+                  title: controller.profiles.isEmpty
+                      ? 'No accounts yet'
+                      : 'No selected account',
+                  description: controller.profiles.isEmpty
+                      ? 'Add your first Codex account to start tracking usage and limits live.'
+                      : 'Select an account from the left panel to manage login and refresh its limits.',
+                )
+              : _AccountDetailCard(controller: controller),
+        ),
       ],
     );
   }
@@ -730,33 +737,39 @@ class _AccountsListPane extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ReorderableListView.builder(
-                buildDefaultDragHandles: false,
-                itemBuilder: (context, index) {
-                  final profile = controller.profiles[index];
-                  return Padding(
-                    key: ValueKey(profile.id),
-                    padding: EdgeInsets.only(
-                      bottom: index == controller.profiles.length - 1 ? 0 : 12,
+              child: controller.profiles.isEmpty
+                  ? _AccountsListEmptyState(onAddAccount: onAddAccount)
+                  : ReorderableListView.builder(
+                      buildDefaultDragHandles: false,
+                      itemBuilder: (context, index) {
+                        final profile = controller.profiles[index];
+                        return Padding(
+                          key: ValueKey(profile.id),
+                          padding: EdgeInsets.only(
+                            bottom:
+                                index == controller.profiles.length - 1 ? 0 : 12,
+                          ),
+                          child: ReorderableDelayedDragStartListener(
+                            index: index,
+                            child: _AccountListTile(
+                              profile: profile,
+                              selected: controller.activeProfile?.id == profile.id,
+                              isDefaultCliProfile: controller.isDefaultCliProfile(
+                                profile.id,
+                              ),
+                              onTap: () => controller.selectProfile(profile.id),
+                              onRename: () => _showRenameProfileDialog(
+                                context,
+                                controller,
+                                profile,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      itemCount: controller.profiles.length,
+                      onReorder: controller.reorderProfiles,
                     ),
-                    child: ReorderableDelayedDragStartListener(
-                      index: index,
-                      child: _AccountListTile(
-                        profile: profile,
-                        selected: controller.activeProfile?.id == profile.id,
-                        onTap: () => controller.selectProfile(profile.id),
-                        onRename: () => _showRenameProfileDialog(
-                          context,
-                          controller,
-                          profile,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-                itemCount: controller.profiles.length,
-                onReorder: controller.reorderProfiles,
-              ),
             ),
             if (controller.errorMessage case final error?)
               _InlineBanner(message: error, tone: BannerTone.error),
@@ -772,16 +785,66 @@ class _AccountsListPane extends StatelessWidget {
   }
 }
 
+class _AccountsListEmptyState extends StatelessWidget {
+  const _AccountsListEmptyState({required this.onAddAccount});
+
+  final VoidCallback onAddAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 240),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.person_add_alt_1_outlined,
+              size: 42,
+              color: scheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No accounts yet',
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Create your first profile and this list will stay here for quick switching.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: onAddAccount,
+              icon: const Icon(Icons.add),
+              label: const Text('Add account'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AccountListTile extends StatelessWidget {
   const _AccountListTile({
     required this.profile,
     required this.selected,
+    required this.isDefaultCliProfile,
     required this.onTap,
     required this.onRename,
   });
 
   final CodexProfile profile;
   final bool selected;
+  final bool isDefaultCliProfile;
   final VoidCallback onTap;
   final VoidCallback onRename;
 
@@ -825,7 +888,21 @@ class _AccountListTile extends StatelessWidget {
           await openMenu(details.globalPosition);
         },
         child: ListTile(
-          title: Text(profile.label),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(profile.label, overflow: TextOverflow.ellipsis),
+              ),
+              if (isDefaultCliProfile) ...[
+                const SizedBox(width: 8),
+                _InlinePill(
+                  label: 'CLI',
+                  icon: Icons.terminal_rounded,
+                  color: scheme.primary,
+                ),
+              ],
+            ],
+          ),
           subtitle: Text(
             probe == null
                 ? 'Checking...'
@@ -908,6 +985,11 @@ class _AccountDetailCard extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
+                          if (controller.isDefaultCliProfile(profile.id))
+                            const _StatusChip(
+                              label: 'Current terminal account',
+                              icon: Icons.terminal_rounded,
+                            ),
                           _StatusChip(
                             label: probe == null
                                 ? 'Checking...'
@@ -961,6 +1043,23 @@ class _AccountDetailCard extends StatelessWidget {
                         MenuItemButton(
                           onPressed: actionsDisabled
                               ? null
+                              : controller.makeActiveProfileDefault,
+                          leadingIcon: const Icon(Icons.swap_horiz),
+                          child: const Text('Make default CLI account'),
+                        ),
+                        MenuItemButton(
+                          onPressed: actionsDisabled
+                              ? null
+                              : () => _showOfficialUsageSyncDialog(
+                                  context,
+                                  controller,
+                                ),
+                          leadingIcon: const Icon(Icons.verified_outlined),
+                          child: const Text('Sync official usage'),
+                        ),
+                        MenuItemButton(
+                          onPressed: actionsDisabled
+                              ? null
                               : controller.openUsagePage,
                           leadingIcon: const Icon(Icons.open_in_new),
                           child: const Text('Usage page'),
@@ -995,6 +1094,13 @@ class _AccountDetailCard extends StatelessWidget {
                 color: scheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              'Source: ${probe?.usageSnapshot?.limitName ?? 'Local Codex CLI telemetry'}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 20),
             _LimitsSection(probe: probe),
             const SizedBox(height: 20),
@@ -1021,6 +1127,10 @@ class _AccountDetailCard extends StatelessWidget {
                   label: 'Plan',
                   value: probe?.usageSnapshot?.planType ?? 'Unknown',
                 ),
+                if (probe?.usageSnapshot?.limitName case final source?)
+                  _MetaLine(label: 'Usage source', value: source),
+                if (profile.notes case final notes?)
+                  _MetaLine(label: 'Account info', value: notes),
               ],
             ),
           ],
@@ -1280,6 +1390,43 @@ class _LimitsSection extends StatelessWidget {
           const SizedBox(height: 12),
         ],
       ],
+    );
+  }
+}
+
+class _InlinePill extends StatelessWidget {
+  const _InlinePill({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1553,6 +1700,211 @@ Future<void> _showRenameProfileDialog(
       );
     },
   );
+}
+
+Future<void> _showOfficialUsageSyncDialog(
+  BuildContext context,
+  AppController controller,
+) async {
+  await showDialog<void>(
+    context: context,
+    builder: (context) => _OfficialUsageSyncDialog(controller: controller),
+  );
+}
+
+class _OfficialUsageSyncDialog extends StatefulWidget {
+  const _OfficialUsageSyncDialog({required this.controller});
+
+  final AppController controller;
+
+  @override
+  State<_OfficialUsageSyncDialog> createState() =>
+      _OfficialUsageSyncDialogState();
+}
+
+class _OfficialUsageSyncDialogState extends State<_OfficialUsageSyncDialog> {
+  late final WebViewController _webController;
+  final OfficialUsagePageParser _parser = OfficialUsagePageParser();
+  CodexUsageSnapshot? _snapshot;
+  String? _errorMessage;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _webController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (_) async {
+            await _pullOfficialUsage();
+          },
+          onWebResourceError: (error) {
+            if (!mounted) {
+              return;
+            }
+            setState(() {
+              _isLoading = false;
+              _errorMessage = error.description;
+            });
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse('https://chatgpt.com/codex/settings/usage'));
+  }
+
+  Future<void> _pullOfficialUsage() async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final raw = await _webController.runJavaScriptReturningResult(
+        'JSON.stringify({text: document.body ? document.body.innerText : ""})',
+      );
+      final text = _extractBodyTextFromJavaScriptResult(raw);
+      final snapshot = _parser.parse(
+        text,
+        planType: widget.controller.activeProfile?.lastProbe?.usageSnapshot?.planType,
+        capturedAt: DateTime.now(),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (snapshot == null) {
+        setState(() {
+          _snapshot = null;
+          _isLoading = false;
+          _errorMessage =
+              'Could not read the official usage yet. If needed, sign in inside this window and open the Usage tab once.';
+        });
+        return;
+      }
+
+      setState(() {
+        _snapshot = snapshot;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _snapshot = null;
+        _isLoading = false;
+        _errorMessage = error.toString();
+      });
+    }
+  }
+
+  String _extractBodyTextFromJavaScriptResult(Object raw) {
+    final rawString = raw is String ? raw : raw.toString();
+    final decoded = jsonDecode(rawString);
+    if (decoded is Map<String, dynamic>) {
+      return decoded['text'] as String? ?? '';
+    }
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final snapshot = _snapshot;
+    return AlertDialog(
+      title: const Text('Sync official usage'),
+      content: SizedBox(
+        width: 820,
+        height: 620,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This reads the balance from the official ChatGPT usage page inside the app. If the page asks for login, complete it here once.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: ColoredBox(
+                  color: scheme.surfaceContainerLowest,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: WebViewWidget(controller: _webController),
+                      ),
+                      if (_isLoading)
+                        const Positioned.fill(
+                          child: ColoredBox(
+                            color: Color(0x66000000),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (snapshot != null)
+              Text(
+                'Detected official weekly balance: ${snapshot.windows.first.remainingPercent}% remaining.',
+              ),
+            if (_errorMessage case final message?)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.error,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+        OutlinedButton.icon(
+          onPressed: _isLoading
+              ? null
+              : () async {
+                  await _webController.reload();
+                },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Refresh page'),
+        ),
+        FilledButton.icon(
+          onPressed: snapshot == null
+              ? null
+              : () async {
+                  await widget.controller.applyOfficialUsageSnapshot(
+                    snapshot,
+                    statusMessage:
+                        'Synced the official usage page for "${widget.controller.activeProfile?.label ?? 'this account'}".',
+                  );
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+          icon: const Icon(Icons.verified_outlined),
+          label: const Text('Use official balance'),
+        ),
+      ],
+    );
+  }
 }
 
 String? _compactLimitSummary(CodexProbe? probe) {

@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:clash/models/app_color_style.dart';
+import 'package:clash/models/codex_probe.dart';
 import 'package:clash/models/codex_profile.dart';
+import 'package:clash/models/codex_usage_snapshot.dart';
 import 'package:clash/services/codex_command_service.dart';
+import 'package:clash/services/official_usage_parser.dart';
 import 'package:clash/services/profile_store.dart';
 import 'package:flutter/material.dart';
 
@@ -19,7 +22,9 @@ class AppController extends ChangeNotifier {
 
   List<CodexProfile> _profiles = const [];
   String? _activeProfileId;
+  String? _defaultCliProfileId;
   Timer? _loginWatchTimer;
+  Timer? _liveUsagePollTimer;
   final Map<String, StreamSubscription<FileSystemEvent>> _profileWatchers = {};
   final Map<String, Timer> _watchDebounceTimers = {};
   bool _isBootstrappingLive = false;
@@ -37,6 +42,18 @@ class AppController extends ChangeNotifier {
   bool get isBusy => _isBusy;
   String? get errorMessage => _errorMessage;
   String? get statusMessage => _statusMessage;
+  CodexProfile? get defaultCliProfile {
+    final targetId = _defaultCliProfileId;
+    if (targetId == null) {
+      return null;
+    }
+    for (final profile in _profiles) {
+      if (profile.id == targetId) {
+        return profile;
+      }
+    }
+    return null;
+  }
   CodexProfile? get activeProfile {
     final targetId = _activeProfileId;
     if (targetId == null) {
@@ -50,25 +67,47 @@ class AppController extends ChangeNotifier {
     return _profiles.isEmpty ? null : _profiles.first;
   }
 
+  bool isDefaultCliProfile(String profileId) => _defaultCliProfileId == profileId;
+
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
 
     try {
       final stored = await _profileStore.load();
-      _profiles = stored.profiles;
+      final discovered = await _profileStore.mergeDiscoveredProfiles(
+        stored.profiles,
+      );
+      _profiles = discovered.profiles;
       _themeMode = _themeModeFromName(stored.themeModeName);
       _palettePreset = AppPalettePresetX.fromStorageName(
         stored.palettePresetName,
       );
+      _defaultCliProfileId = _resolveDefaultCliProfileId(
+        stored.defaultCliProfileId,
+      );
       _activeProfileId =
-          stored.activeProfileId ?? stored.profiles.firstOrNull?.id;
+          stored.activeProfileId ?? _profiles.firstOrNull?.id;
+      if (discovered.importedCount > 0 ||
+          stored.defaultCliProfileId != _defaultCliProfileId) {
+        await _profileStore.save(
+          activeProfileId: _activeProfileId,
+          defaultCliProfileId: _defaultCliProfileId,
+          profiles: _profiles,
+          themeModeName: _themeModeName(_themeMode),
+          palettePresetName: _palettePreset.storageName,
+        );
+        _statusMessage = discovered.importedCount == 1
+            ? 'Imported 1 existing Codex account automatically.'
+            : 'Imported ${discovered.importedCount} existing Codex accounts automatically.';
+      }
       await _restartProfileWatchers();
       final initialProfile = activeProfile;
       if (initialProfile != null) {
         unawaited(_refreshProfileSilently(initialProfile.id));
       }
       unawaited(_bootstrapLiveLimits());
+      _startLiveUsagePolling();
     } catch (error) {
       _errorMessage = error.toString();
     } finally {
@@ -103,6 +142,7 @@ class AppController extends ChangeNotifier {
     _activeProfileId = profile.id;
     await _persist(statusMessage: 'Created profile "${profile.label}".');
     await _restartProfileWatchers();
+    unawaited(_refreshProfileSilently(profile.id, refreshUsage: true));
   }
 
   Future<void> renameProfile({
@@ -208,7 +248,9 @@ class AppController extends ChangeNotifier {
     }
 
     await _runGuarded(() async {
-      final probe = await _commandService.probeLogin(profile);
+      final probe = await _commandService.probeLogin(
+        _effectiveProfile(profile),
+      );
       _profiles = _profiles
           .map(
             (item) =>
@@ -243,7 +285,7 @@ class AppController extends ChangeNotifier {
     }
 
     await _runGuarded(() async {
-      await _commandService.launchCodex(profile);
+      await _commandService.launchCodex(_effectiveProfile(profile));
       _statusMessage = 'Opened Codex for "${profile.label}".';
       notifyListeners();
     });
@@ -256,7 +298,7 @@ class AppController extends ChangeNotifier {
     }
 
     await _runGuarded(() async {
-      await _commandService.launchDeviceAuthLogin(profile);
+      await _commandService.launchDeviceAuthLogin(_effectiveProfile(profile));
       _statusMessage =
           'Opened the Codex login flow for "${profile.label}". Finish login in the terminal and this app will re-check automatically.';
       notifyListeners();
@@ -272,33 +314,85 @@ class AppController extends ChangeNotifier {
     });
   }
 
+  Future<void> makeActiveProfileDefault() async {
+    final profile = activeProfile;
+    if (profile == null) {
+      return;
+    }
+
+    await _runGuarded(() async {
+      await _switchDefaultCliProfile(profile.id);
+      _statusMessage =
+          'Set "${profile.label}" as the default terminal Codex account. Reopen your terminal and run codex.';
+      notifyListeners();
+    });
+  }
+
+  Future<void> applyOfficialUsageSnapshot(
+    CodexUsageSnapshot snapshot, {
+    String? statusMessage,
+  }) async {
+    final profile = activeProfile;
+    if (profile == null) {
+      return;
+    }
+
+    final currentProbe = profile.lastProbe;
+    final nextProbe = CodexProbe(
+      loginSummary:
+          currentProbe?.loginSummary ?? 'Official usage synced from ChatGPT.',
+      checkedAt: DateTime.now(),
+      isLoggedIn: currentProbe?.isLoggedIn ?? true,
+      usageSnapshot: snapshot,
+    );
+
+    _profiles = _profiles
+        .map(
+          (item) =>
+              item.id == profile.id ? item.copyWith(lastProbe: nextProbe) : item,
+        )
+        .toList();
+    await _persist(
+      statusMessage:
+          statusMessage ??
+          'Synced the official usage page for "${profile.label}".',
+    );
+  }
+
   String manualStatusCommandForActive() {
     final profile = activeProfile;
     return profile == null
         ? ''
-        : _commandService.buildManualStatusCommand(profile);
+        : _commandService.buildManualStatusCommand(_effectiveProfile(profile));
   }
 
   String loginCommandForActive() {
     final profile = activeProfile;
-    return profile == null ? '' : _commandService.buildLoginCommand(profile);
+    return profile == null
+        ? ''
+        : _commandService.buildLoginCommand(_effectiveProfile(profile));
   }
 
   String deviceAuthFallbackCommandForActive() {
     final profile = activeProfile;
     return profile == null
         ? ''
-        : _commandService.buildDeviceAuthFallbackCommand(profile);
+        : _commandService.buildDeviceAuthFallbackCommand(
+            _effectiveProfile(profile),
+          );
   }
 
   String zedHintForActive() {
     final profile = activeProfile;
-    return profile == null ? '' : _commandService.buildZedHint(profile);
+    return profile == null
+        ? ''
+        : _commandService.buildZedHint(_effectiveProfile(profile));
   }
 
   Future<void> _persist({String? statusMessage}) async {
     await _profileStore.save(
       activeProfileId: _activeProfileId,
+      defaultCliProfileId: _defaultCliProfileId,
       profiles: _profiles,
       themeModeName: _themeModeName(_themeMode),
       palettePresetName: _palettePreset.storageName,
@@ -335,7 +429,7 @@ class AppController extends ChangeNotifier {
     _watchDebounceTimers.clear();
 
     for (final profile in _profiles) {
-      final directory = Directory(profile.codexHome);
+      final directory = Directory(_effectiveCodexHome(profile));
       await directory.create(recursive: true);
       _profileWatchers[profile.id] = directory.watch(recursive: true).listen((
         event,
@@ -347,13 +441,21 @@ class AppController extends ChangeNotifier {
 
         _watchDebounceTimers[profile.id]?.cancel();
         _watchDebounceTimers[profile.id] = Timer(
-          const Duration(milliseconds: 900),
+          const Duration(milliseconds: 350),
           () {
-            unawaited(_refreshProfileSilently(profile.id));
+            if (path.endsWith('auth.json')) {
+              unawaited(_refreshProfileSilently(profile.id));
+              return;
+            }
+            unawaited(
+              _refreshUsageSnapshotSilently(profile.id, forceRescan: true),
+            );
           },
         );
       });
     }
+
+    _startLiveUsagePolling();
   }
 
   Future<void> _refreshProfileSilently(
@@ -368,17 +470,24 @@ class AppController extends ChangeNotifier {
 
     try {
       final probe = await _commandService.probeLogin(
-        profile,
+        _effectiveProfile(profile),
         refreshUsage: refreshUsage,
+      );
+      final preservedProbe = _preserveOfficialUsageSnapshot(
+        currentProbe: profile.lastProbe,
+        nextProbe: probe,
+        allowOverride: refreshUsage,
       );
       _profiles = _profiles
           .map(
-            (item) =>
-                item.id == profileId ? item.copyWith(lastProbe: probe) : item,
+            (item) => item.id == profileId
+                ? item.copyWith(lastProbe: preservedProbe)
+                : item,
           )
           .toList();
       await _profileStore.save(
         activeProfileId: _activeProfileId,
+        defaultCliProfileId: _defaultCliProfileId,
         profiles: _profiles,
         themeModeName: _themeModeName(_themeMode),
         palettePresetName: _palettePreset.storageName,
@@ -401,7 +510,10 @@ class AppController extends ChangeNotifier {
       return;
     }
 
-    final probe = await _commandService.probeLogin(profile, refreshUsage: true);
+    final probe = await _commandService.probeLogin(
+      _effectiveProfile(profile),
+      refreshUsage: true,
+    );
     _profiles = _profiles
         .map(
           (item) =>
@@ -409,6 +521,63 @@ class AppController extends ChangeNotifier {
         )
         .toList();
     await _persist(statusMessage: statusMessage);
+  }
+
+  Future<void> _refreshUsageSnapshotSilently(
+    String profileId, {
+    bool forceRescan = false,
+  }) async {
+    final profile = _findProfile(profileId);
+    if (profile == null) {
+      return;
+    }
+
+    try {
+      final snapshot = await _commandService.readLatestUsageSnapshot(
+        _effectiveProfile(profile),
+        forceRescan: forceRescan,
+      );
+      if (snapshot == null) {
+        return;
+      }
+
+      final currentProbe = profile.lastProbe;
+      final currentSnapshot = currentProbe?.usageSnapshot;
+      if (_isOfficialUsageSnapshot(currentSnapshot)) {
+        return;
+      }
+      if (currentSnapshot != null &&
+          !snapshot.capturedAt.isAfter(currentSnapshot.capturedAt)) {
+        return;
+      }
+
+      final nextProbe = CodexProbe(
+        loginSummary: _liveUsageSummary(currentProbe),
+        checkedAt: _latestDate(
+          currentProbe?.checkedAt,
+          snapshot.capturedAt,
+        ),
+        isLoggedIn: true,
+        usageSnapshot: snapshot,
+      );
+
+      _profiles = _profiles
+          .map(
+            (item) =>
+                item.id == profileId ? item.copyWith(lastProbe: nextProbe) : item,
+          )
+          .toList();
+      await _profileStore.save(
+        activeProfileId: _activeProfileId,
+        defaultCliProfileId: _defaultCliProfileId,
+        profiles: _profiles,
+        themeModeName: _themeModeName(_themeMode),
+        palettePresetName: _palettePreset.storageName,
+      );
+      notifyListeners();
+    } catch (_) {
+      // Best-effort live usage refresh should stay silent.
+    }
   }
 
   Future<void> _bootstrapLiveLimits() async {
@@ -449,6 +618,29 @@ class AppController extends ChangeNotifier {
         const Duration(minutes: 5);
   }
 
+  void _startLiveUsagePolling() {
+    _liveUsagePollTimer?.cancel();
+    if (_profiles.isEmpty) {
+      return;
+    }
+
+    var pollCount = 0;
+    _liveUsagePollTimer = Timer.periodic(const Duration(seconds: 4), (
+      timer,
+    ) {
+      pollCount += 1;
+      final forceRescan = pollCount % 8 == 0;
+      for (final profile in List<CodexProfile>.from(_profiles)) {
+        unawaited(
+          _refreshUsageSnapshotSilently(
+            profile.id,
+            forceRescan: forceRescan,
+          ),
+        );
+      }
+    });
+  }
+
   void _startLoginWatch(String profileId) {
     _loginWatchTimer?.cancel();
     var attempts = 0;
@@ -464,7 +656,9 @@ class AppController extends ChangeNotifier {
       }
 
       try {
-        final probe = await _commandService.probeLogin(profile);
+        final probe = await _commandService.probeLogin(
+          _effectiveProfile(profile),
+        );
         _profiles = _profiles
             .map(
               (item) =>
@@ -473,6 +667,7 @@ class AppController extends ChangeNotifier {
             .toList();
         await _profileStore.save(
           activeProfileId: _activeProfileId,
+          defaultCliProfileId: _defaultCliProfileId,
           profiles: _profiles,
           themeModeName: _themeModeName(_themeMode),
           palettePresetName: _palettePreset.storageName,
@@ -480,7 +675,7 @@ class AppController extends ChangeNotifier {
 
         if (probe.isLoggedIn) {
           final enrichedProbe = await _commandService.probeLogin(
-            profile,
+            _effectiveProfile(profile),
             refreshUsage: true,
           );
           _profiles = _profiles
@@ -492,6 +687,7 @@ class AppController extends ChangeNotifier {
               .toList();
           await _profileStore.save(
             activeProfileId: _activeProfileId,
+            defaultCliProfileId: _defaultCliProfileId,
             profiles: _profiles,
             themeModeName: _themeModeName(_themeMode),
             palettePresetName: _palettePreset.storageName,
@@ -521,9 +717,102 @@ class AppController extends ChangeNotifier {
     return null;
   }
 
+  String? _resolveDefaultCliProfileId(String? storedDefaultCliProfileId) {
+    if (storedDefaultCliProfileId != null &&
+        _findProfile(storedDefaultCliProfileId) != null) {
+      return storedDefaultCliProfileId;
+    }
+
+    final defaultHome = _normalizeHome(_commandService.defaultCodexHome());
+    for (final profile in _profiles) {
+      if (_normalizeHome(profile.codexHome) == defaultHome) {
+        return profile.id;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _switchDefaultCliProfile(String profileId) async {
+    final nextProfile = _findProfile(profileId);
+    if (nextProfile == null) {
+      return;
+    }
+
+    final previousDefaultId = _defaultCliProfileId;
+    if (previousDefaultId != null && previousDefaultId != profileId) {
+      final previousProfile = _findProfile(previousDefaultId);
+      if (previousProfile != null &&
+          _normalizeHome(previousProfile.codexHome) !=
+              _commandService.defaultCodexHome()) {
+        await _commandService.syncCodexHome(
+          sourceHome: _commandService.defaultCodexHome(),
+          targetHome: previousProfile.codexHome,
+        );
+      }
+    }
+
+    await _commandService.makeProfileDefault(nextProfile);
+    _defaultCliProfileId = profileId;
+    await _persist();
+    await _restartProfileWatchers();
+    unawaited(_refreshProfileSilently(profileId));
+  }
+
+  CodexProfile _effectiveProfile(CodexProfile profile) {
+    final effectiveHome = _effectiveCodexHome(profile);
+    if (effectiveHome == profile.codexHome) {
+      return profile;
+    }
+    return profile.copyWith(codexHome: effectiveHome);
+  }
+
+  String _effectiveCodexHome(CodexProfile profile) {
+    if (profile.id == _defaultCliProfileId) {
+      return _commandService.defaultCodexHome();
+    }
+    return profile.codexHome;
+  }
+
+  String _normalizeHome(String path) => Directory(path).absolute.path;
+
+  String _liveUsageSummary(CodexProbe? probe) {
+    if (probe == null || !probe.isLoggedIn) {
+      return 'Signed in from local Codex session activity.';
+    }
+    return probe.loginSummary;
+  }
+
+  DateTime _latestDate(DateTime? left, DateTime right) {
+    if (left == null || right.isAfter(left)) {
+      return right;
+    }
+    return left;
+  }
+
+  CodexProbe _preserveOfficialUsageSnapshot({
+    required CodexProbe? currentProbe,
+    required CodexProbe nextProbe,
+    required bool allowOverride,
+  }) {
+    final currentSnapshot = currentProbe?.usageSnapshot;
+    if (!allowOverride && _isOfficialUsageSnapshot(currentSnapshot)) {
+      return CodexProbe(
+        loginSummary: nextProbe.loginSummary,
+        checkedAt: nextProbe.checkedAt,
+        isLoggedIn: nextProbe.isLoggedIn,
+        usageSnapshot: currentSnapshot,
+      );
+    }
+    return nextProbe;
+  }
+
+  bool _isOfficialUsageSnapshot(CodexUsageSnapshot? snapshot) =>
+      snapshot?.limitName == officialUsageLimitName;
+
   @override
   void dispose() {
     _loginWatchTimer?.cancel();
+    _liveUsagePollTimer?.cancel();
     for (final timer in _watchDebounceTimers.values) {
       timer.cancel();
     }
